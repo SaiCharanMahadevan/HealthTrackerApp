@@ -2,7 +2,6 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
-  text-align: center;
 }
 
 .logo {
@@ -45,7 +44,6 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
-  text-align: center;
   width: 100%;
 }
 
@@ -98,87 +96,6 @@ nav button:hover {
   border-color: transparent; /* Override button hover border */
 }
 
-main {
-  /* Styles for the main content area */
-  margin-top: 2rem;
-}
-
-/* Form Styling */
-.form-container {
-  max-width: 400px;
-  margin: 2rem auto; /* Center form */
-  padding: 2rem;
-  border: 1px solid #444;
-  border-radius: 8px;
-  background-color: #2d2d2d; /* Slightly lighter than main bg */
-  text-align: left; /* Align form elements left */
-}
-
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: bold;
-}
-
-.form-group input[type="email"],
-.form-group input[type="password"] {
-  width: 100%;
-  padding: 0.8em;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background-color: #333;
-  color: #eee;
-  font-size: 1em;
-}
-
-.form-container button[type="submit"] {
-  width: 100%;
-  padding: 0.8em 1.2em;
-  background-color: #646cff;
-  color: white;
-  border: none;
-  margin-top: 1rem; /* Space above button */
-}
-
-.form-container button[type="submit"]:hover {
-  background-color: #535bf2;
-  border-color: transparent;
-}
-
-.form-container p {
-  margin-top: 1.5rem;
-  text-align: center;
-}
-
-.form-container p a {
-  font-weight: bold;
-}
-
-/* Specific styles for HomePage Entry Form */
-.entry-form textarea {
-  width: 100%;
-  max-width: 600px;
-  padding: 0.8em;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background-color: #333;
-  color: #eee;
-  font-size: 1em;
-  font-family: inherit;
-  margin-bottom: 0.5rem;
-}
-
-.entry-form button[type="submit"] {
-  /* Reuse some button styles or define specifics */
-  padding: 0.6em 1.2em;
-  background-color: #646cff;
-  color: white;
-}
-
 /* Entry List Styling */
 .entry-list {
   list-style: none;
@@ -203,4 +120,304 @@ main {
   margin-bottom: 0.5rem;
   color: #aaa;
   font-size: 0.9em;
+}
+
+/* App.css - Add application-specific styles here */
+
+.auth-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh; /* Ensure it takes full viewport height */
+  padding: 2rem; /* Add some padding around */
+}
+
+.auth-form-card {
+  background-color: rgba(40, 40, 40, 0.9);
+  padding: 2rem 2.5rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  flex: 0 0 480px;
+  max-width: 480px;
+  text-align: center;
+}
+
+.auth-form-card h1,
+.auth-form-card h2 {
+  margin-bottom: 1.5rem;
+}
+
+.auth-form-card p {
+  margin-bottom: 1.5rem;
+}
+
+.auth-form-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* Space between form elements */
+  text-align: left; /* Align labels/inputs left */
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  margin-bottom: 0.4rem;
+  font-weight: 500;
+  font-size: 0.9em;
+}
+
+.form-group input {
+  padding: 0.75rem 1rem;
+  border: 1px solid #555; /* Darker border */
+  background-color: #333; /* Dark input background */
+  color: #eee; /* Light text */
+  border-radius: 5px;
+  font-size: 1em;
+}
+
+.auth-form-card button[type="submit"] {
+  margin-top: 1rem; /* Space above submit button */
+  background-color: #646cff;
+  color: white;
+  transition: background-color 0.2s ease;
+}
+
+.auth-form-card button[type="submit"]:hover {
+  background-color: #535bf2;
+  border-color: #535bf2;
+}
+
+.auth-form-card button {
+  margin-top: 1rem; /* Also space above the switch button */
+}
+
+/* Error message style */
+.auth-form-card p[style*="color: red"] {
+  margin-top: 1rem;
+  font-size: 0.9em;
+  font-weight: bold;
+}
+
+/* HomePage Layout */
+.home-page-container {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 2rem; /* Padding around the whole page */
+  max-width: 1280px; /* Consistent max-width */
+  margin: 0 auto; /* Center the container */
+}
+
+.home-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #444; /* Separator */
+}
+
+.home-header h1 {
+  margin: 0;
+}
+
+.user-info span {
+  margin-right: 1rem;
+}
+
+.home-main-content {
+  /* Add styles if needed, e.g., flex for side-by-side layout */
+}
+
+.log-entry-section,
+.view-entry-section {
+  margin-bottom: 2rem;
+}
+
+.log-entry-section h2,
+.view-entry-section h2 {
+  margin-bottom: 1rem;
+  color: #aaa; /* Lighter heading color */
+}
+
+/* EntryInput Styling */
+.entry-input-card {
+  background-color: rgba(40, 40, 40, 0.9);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.entry-input-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.entry-input-card textarea {
+  padding: 0.75rem 1rem;
+  border: 1px solid #555;
+  background-color: #333;
+  color: #eee;
+  border-radius: 5px;
+  font-size: 1em;
+  font-family: inherit;
+  resize: vertical; /* Allow vertical resize */
+  min-height: 80px;
+}
+
+.entry-input-card button {
+  align-self: flex-start; /* Align button to the left */
+}
+
+/* EntryList Styling */
+.entry-list-card {
+  background-color: rgba(40, 40, 40, 0.9);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.entry-list-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.entry-list-card li {
+  padding: 1rem 0;
+  border-bottom: 1px solid #444;
+}
+
+.entry-list-card li:last-child {
+  border-bottom: none;
+}
+
+.entry-list-card strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #888; /* Lighter color for timestamp */
+  font-size: 0.9em;
+}
+
+.entry-content {
+  line-height: 1.6;
+}
+
+/* Error Message Styling (General) */
+.error-message {
+  color: #ff6b6b; /* A softer red */
+  margin-top: 0.5rem;
+  font-size: 0.9em;
+}
+
+/* Specific styles for HomePage Entry Form */
+.entry-form textarea {
+  width: 100%;
+  max-width: 600px;
+  padding: 0.8em;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: #333;
+  color: #eee;
+  font-size: 1em;
+  font-family: inherit;
+  margin-bottom: 0.5rem;
+}
+
+.entry-form button[type="submit"] {
+  /* Reuse some button styles or define specifics */
+  padding: 0.6em 1.2em;
+  background-color: #646cff;
+  color: white;
+}
+
+/* Reports Section Layout */
+.reports-section {
+    margin-bottom: 3rem;
+}
+
+.reports-section h2 {
+    margin-bottom: 1.5rem;
+    text-align: left;
+    color: #ccc;
+    border-bottom: 1px solid #444;
+    padding-bottom: 0.5rem;
+}
+
+/* Grid layout for reports (optional, can stack vertically too) */
+.reports-grid {
+    display: grid;
+    /* grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); */ /* Example: 2 columns if space allows */
+    grid-template-columns: 1fr; /* Default: single column */
+    gap: 2rem;
+}
+
+/* Summary Card Styling */
+.summary-card {
+    background-color: rgba(40, 40, 40, 0.9);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.summary-card h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #bbb;
+    border-bottom: 1px solid #555;
+    padding-bottom: 0.5rem;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Responsive columns */
+    gap: 1rem;
+    font-size: 0.95em;
+}
+
+.summary-grid div {
+    background-color: #333;
+    padding: 0.8rem;
+    border-radius: 5px;
+}
+
+.summary-grid strong {
+    color: #aaa;
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.9em;
+}
+
+/* Trends Card Styling */
+.trends-card {
+    background-color: rgba(40, 40, 40, 0.9);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.trends-card h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #bbb;
+    border-bottom: 1px solid #555;
+    padding-bottom: 0.5rem;
+}
+
+.trends-card h4 {
+    margin-top: 0; /* Reset top margin if needed */
+    margin-bottom: 1rem;
+    color: #aaa;
+    text-align: center;
+}
+
+/* Recharts Customization (Optional) */
+.recharts-tooltip-wrapper {
+    /* Example: Adjust tooltip style */
+}
+.recharts-legend-item {
+   /* Example: Adjust legend style */
 }

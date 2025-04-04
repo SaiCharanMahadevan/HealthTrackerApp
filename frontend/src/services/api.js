@@ -12,95 +12,113 @@ const apiClient = axios.create({
   },
 });
 
-// Function to handle login
-export const loginUser = async (email, password) => {
-  try {
-    // FastAPI's OAuth2PasswordRequestForm expects form data
-    const formData = new URLSearchParams();
-    formData.append('username', email);
-    formData.append('password', password);
-
-    const response = await apiClient.post('/auth/login', formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
-    return response.data; // Should contain { access_token: "...", token_type: "bearer" }
-  } catch (error) {
-    console.error('Login API error:', error.response || error.message);
-    // Rethrow or handle specific error codes (e.g., 401 Unauthorized)
-    throw error.response?.data || new Error('Login failed');
-  }
-};
-
-// Function to handle signup
-export const signupUser = async (email, password) => {
-  try {
-    const response = await apiClient.post('/auth/signup', {
-      email,
-      password,
-    });
-    return response.data; // Should contain user details (id, email, is_active)
-  } catch (error) {
-    console.error('Signup API error:', error.response || error.message);
-    // Rethrow or handle specific error codes (e.g., 400 Bad Request - user exists)
-    throw error.response?.data || new Error('Signup failed');
-  }
-};
-
-// Function to get current user (requires auth token)
-export const getCurrentUser = async (token) => {
-    if (!token) throw new Error('No token provided');
-    try {
-        const response = await apiClient.get('/auth/me', {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error('Get current user API error:', error.response || error.message);
-        throw error.response?.data || new Error('Failed to fetch user');
+const handleResponse = async (response) => {
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        console.error('API Error:', errorData);
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    // Handle cases where response might be empty (e.g., 204 No Content)
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.indexOf("application/json") !== -1) {
+        return response.json();
+    } else {
+        return {}; // Return empty object or handle as needed
     }
 };
 
-// Function to create a health entry
-export const createHealthEntry = async (token, entryText) => {
-  if (!token) throw new Error('No token provided');
-  try {
-    const response = await apiClient.post(
-      '/entries/', 
-      { entry_text: entryText }, // Send data as JSON body
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    return response.data; // The newly created entry
-  } catch (error) {
-    console.error('Create entry API error:', error.response || error.message);
-    throw error.response?.data || new Error('Failed to create entry');
-  }
+const apiService = {
+    signup: async (email, password) => {
+        const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+        });
+        return handleResponse(response);
+    },
+
+    login: async (email, password) => {
+        const formData = new URLSearchParams();
+        formData.append('username', email);
+        formData.append('password', password);
+
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString(),
+        });
+        return handleResponse(response); // Returns { access_token, token_type }
+    },
+
+    getCurrentUser: async (token) => {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        return handleResponse(response);
+    },
+
+    createEntry: async (entryText, token) => {
+        const response = await fetch(`${API_BASE_URL}/entries/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ entry_text: entryText }),
+        });
+        return handleResponse(response);
+    },
+
+    getEntries: async (token, skip = 0, limit = 100) => {
+        const response = await fetch(`${API_BASE_URL}/entries/?skip=${skip}&limit=${limit}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        return handleResponse(response);
+    },
+
+    getWeeklySummary: async (token, targetDate = null) => {
+        let url = `${API_BASE_URL}/reports/summary/weekly`;
+        if (targetDate) {
+            // Assuming targetDate is in YYYY-MM-DD format
+            url += `?target_date_str=${targetDate}`;
+        }
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        return handleResponse(response);
+    },
+
+    getTrends: async (token, startDate = null, endDate = null) => {
+        let url = `${API_BASE_URL}/reports/trends`;
+        const params = new URLSearchParams();
+        if (startDate) {
+            params.append('start_date_str', startDate); // YYYY-MM-DD
+        }
+        if (endDate) {
+            params.append('end_date_str', endDate); // YYYY-MM-DD
+        }
+        const queryString = params.toString();
+        if (queryString) {
+            url += `?${queryString}`;
+        }
+
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        return handleResponse(response);
+    },
 };
 
-// Function to get health entries
-export const getHealthEntries = async (token, skip = 0, limit = 100) => {
-  if (!token) throw new Error('No token provided');
-  try {
-    const response = await apiClient.get('/entries/', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      params: { skip, limit }, // Add query parameters for pagination
-    });
-    return response.data; // List of entries
-  } catch (error) {
-    console.error('Get entries API error:', error.response || error.message);
-    throw error.response?.data || new Error('Failed to fetch entries');
-  }
-};
-
-// We can add an interceptor later to automatically add the auth token to requests
-
-export default apiClient; 
+export default apiService; 

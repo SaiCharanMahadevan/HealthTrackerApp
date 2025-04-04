@@ -1,98 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import {
+    BrowserRouter as Router, // Corrected: Was double-imported in main.jsx initially
+    Routes,
+    Route,
+    Navigate
+} from 'react-router-dom';
 import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
-import './App.css';
-
-// Simple Protected Route Component
-function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('authToken');
-  if (!token) {
-    // Redirect them to the /login page, but save the current location they were
-    // trying to go to when they were redirected. This allows us to send them
-    // along to that page after they login, which is a nicer user experience
-    // than dropping them off on the home page.
-    return <Navigate to="/login" replace />;
-  }
-
-  return children;
-}
+import AuthPage from './pages/AuthPage';
+import useAuth from './hooks/useAuth';
+import './App.css'; // Ensure App.css is imported
+// import './App.css'; // Assuming you have App.css for styling
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('authToken'));
-  const navigate = useNavigate(); // Need navigate for logout
-  const location = useLocation(); // Get current location
+    const { token, loading } = useAuth();
 
-  // Define routes where the main navigation should be hidden
-  const hideNavRoutes = ['/login', '/signup'];
-  const shouldHideNav = hideNavRoutes.includes(location.pathname);
+    if (loading) {
+        // Optional: Show a loading spinner or message while checking auth state
+        return <div>Loading...</div>;
+    }
 
-  // Effect to update state if token changes in localStorage (e.g., after login)
-  // This is a basic approach; context/state management libraries are better for complex apps
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setToken(localStorage.getItem('authToken'));
-    };
-    // Listen for custom event dispatched after login/logout if needed, or poll
-    // For simplicity, we rely on the page reload in LoginPage for now
-    // A better way is needed if we remove the reload
-    setToken(localStorage.getItem('authToken')); // Initial check
-
-    // A more robust way: listen to storage events (only works across tabs/windows)
-    // window.addEventListener('storage', handleStorageChange);
-    // return () => window.removeEventListener('storage', handleStorageChange);
-
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    setToken(null);
-    navigate('/login'); // Redirect to login after logout
-     // Optionally force reload if needed: window.location.reload();
-  };
-
-  return (
-    <div className="App">
-      {/* Conditionally render the nav */} 
-      {!shouldHideNav && (
-        <nav>
-          <ul>
-            <li><Link to="/">Home</Link></li>
-            {!token ? (
-              <>
-                <li><Link to="/login">Login</Link></li>
-                <li><Link to="/signup">Sign Up</Link></li>
-              </>
-            ) : (
-              <li><button onClick={handleLogout}>Logout</button></li>
-            )}
-          </ul>
-        </nav>
-      )}
-
-      <main>
-        <Routes>
-           {/* Protected Home Route */}
-          <Route 
-            path="/"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          {/* Redirect root to login if not authenticated? Or keep separate? */}
-          {/* Consider adding a 404 Not Found route */}
-        </Routes>
-      </main>
-    </div>
-  );
+    return (
+        // Router might be here or in main.jsx, ensure it's only in one place
+        // If Router is in main.jsx, remove it from here.
+        // <Router> 
+            <div className="App">
+                <Routes>
+                    <Route 
+                        path="/" 
+                        element={token ? <HomePage /> : <Navigate to="/auth" replace />}
+                    />
+                    <Route 
+                        path="/auth" 
+                        element={!token ? <AuthPage /> : <Navigate to="/" replace />}
+                    />
+                    {/* Add other routes here */}
+                    <Route path="*" element={<Navigate to="/" replace />} /> {/* Catch-all redirects to home */}
+                </Routes>
+            </div>
+        // </Router>
+    );
 }
-
-// App needs to be wrapped by BrowserRouter, so useNavigate works
-// We ensure this in main.jsx
 
 export default App;
