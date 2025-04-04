@@ -33,4 +33,16 @@ class TrendReportBase(BaseModel):
     # Add calorie/macro trends later if needed
 
 class TrendReport(TrendReportBase):
-    pass # No extra fields needed for response currently 
+    pass # No extra fields needed for response currently
+
+
+# --- Daily Summary Schemas ---
+
+class DailySummaryBase(BaseModel):
+    date: date
+    total_calories: Optional[int] = None
+    total_steps: Optional[int] = None
+    last_weight_kg: Optional[float] = None
+
+class DailySummary(DailySummaryBase):
+    pass 

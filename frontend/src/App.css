@@ -498,3 +498,178 @@ nav button:hover {
     background-color: #777;
     border-color: #999;
 }
+
+/* ================= */
+/* Responsive Design */
+/* ================= */
+
+/* Medium Screens / Tablets */
+@media (max-width: 992px) {
+  .App, 
+  .home-page-container,
+  .auth-page {
+    padding: 1.5rem; /* Slightly reduce padding */
+  }
+
+  .auth-form-card {
+    padding: 1.5rem 2rem;
+    /* max-width: 520px; /* Optionally adjust max-width */
+  }
+}
+
+/* Small Screens / Mobile */
+@media (max-width: 768px) {
+  #root, /* Reduce root padding on small screens */
+  .App, 
+  .home-page-container,
+  .auth-page {
+    padding: 1rem; /* Further reduce padding */
+  }
+
+  .auth-form-card {
+    padding: 1.5rem;
+    max-width: 95%; /* Allow it to take most of the width */
+    flex-basis: auto; /* Let width/max-width control */
+    width: auto; /* Let width/max-width control */
+  }
+
+  .home-header {
+    flex-direction: column; /* Stack header items */
+    align-items: flex-start; /* Align to left */
+    gap: 0.5rem;
+  }
+
+  .user-info {
+    margin-top: 0.5rem;
+    align-self: flex-start; /* Keep user info aligned left */
+  }
+
+  .reports-grid {
+     grid-template-columns: 1fr; /* Ensure single column */
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* Allow more flexible wrapping */
+    gap: 0.8rem;
+  }
+
+  /* Ensure buttons have decent touch size */
+  button,
+  .entry-actions button,
+  .edit-actions button {
+    padding: 0.7em 1em; /* Adjust padding for touch */
+    min-height: 44px; /* Minimum touch target height */
+    min-width: 44px; /* Minimum touch target width */
+  }
+  
+  /* Adjust chart axis labels for smaller screens */
+  .recharts-cartesian-axis-tick-value tspan {
+      font-size: 0.8em; /* Smaller font for axis labels */
+  }
+  .recharts-label {
+      font-size: 0.9em; /* Smaller font for axis titles */
+  }
+
+  /* Reduce chart margin if needed */
+  .recharts-wrapper {
+      /* Example: margin: 0 !important; */
+  }
+
+  .daily-summary-grid {
+    flex-direction: column; /* Stack daily items vertically */
+    align-items: center;
+  }
+  .daily-summary-grid div {
+    flex-basis: auto; /* Let width be auto */
+    width: 80%; /* Control width when stacked */
+  }
+}
+
+/* Specific styles for Daily Summary */
+.daily-summary-card {
+    background-color: rgba(40, 40, 40, 0.9); /* Darker card background */
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Updated Header Styles */
+.daily-summary-header {
+  display: flex;
+  justify-content: center; /* Center items horizontally */
+  align-items: center;
+  margin-bottom: 1rem;
+  user-select: none; /* Prevent text selection on date/buttons */
+}
+
+.daily-summary-header h4 {
+  margin: 0 0.75rem; /* Space around the date */
+  color: #eee;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.daily-summary-header h4:hover {
+  color: #4dabf7; /* Highlight on hover */
+}
+
+/* Date Navigation Buttons */
+.date-nav-button {
+  background: none;
+  color: #ccc;
+  padding: 0.2rem 0.6rem;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  line-height: 1; /* Ensure button height is consistent */
+}
+
+.date-nav-button:hover {
+  background-color: #555;
+  border-color: #888;
+}
+
+.daily-summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around; /* Space items evenly */
+  gap: 1rem; /* Space between items */
+}
+
+.daily-summary-item {
+  background-color: #333; /* Slightly lighter item background */
+  padding: 0.8rem 1rem;
+  border-radius: 6px;
+  text-align: center;
+  flex: 1; /* Allow items to grow */
+  min-width: 100px; /* Minimum width before wrapping */
+}
+
+.daily-summary-item span {
+  display: block;
+  font-size: 0.85rem;
+  color: #bbb;
+  margin-bottom: 0.3rem;
+}
+
+.daily-summary-item strong {
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+/* Responsive adjustments (existing) */
+@media (max-width: 768px) {
+  .daily-summary-grid {
+    flex-direction: column;
+    align-items: stretch; /* Stretch items to full width */
+  }
+  .daily-summary-item {
+     min-width: initial; /* Reset min-width */
+  }
+  .daily-summary-header {
+     justify-content: space-between; /* Space out on smaller screens */
+  }
+}

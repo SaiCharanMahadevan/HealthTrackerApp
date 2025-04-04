@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../services/api';
 import useAuth from '../hooks/useAuth';
+import { formatValue, formatLocalDateTime } from '../utils/formatters'; // Keep this formatter import
 
 // Helper function to display parsed data (adapt as needed based on actual backend response)
 const displayParsedData = (entry) => {
@@ -44,8 +45,8 @@ const displayParsedData = (entry) => {
 };
 
 const EntryList = ({ entries, setEntries, onEntryUpdated, onEntryDeleted }) => {
-    const [listLoading, setListLoading] = useState(false); // Renamed loading state
-    const [listError, setListError] = useState(null); // Renamed error state
+    const [listLoading, setListLoading] = useState(false); 
+    const [listError, setListError] = useState(null); 
     const { token } = useAuth();
 
     // State for inline editing
@@ -123,10 +124,12 @@ const EntryList = ({ entries, setEntries, onEntryUpdated, onEntryDeleted }) => {
     return (
         <div className="entry-list-card"> 
             {entries.length > 0 ? (
-                <ul>
+                // Restore original ul/li structure
+                <ul> 
                     {entries.map((entry) => (
                         <li key={entry.id}>
-                            <strong>{new Date(entry.timestamp).toLocaleString()}:</strong>
+                            {/* Apply formatting to the timestamp here */}
+                            <strong>{formatLocalDateTime(entry.timestamp)}:</strong> 
                             {editingEntryId === entry.id ? (
                                 <div className="edit-form"> {/* Inline Edit Form */} 
                                     <textarea

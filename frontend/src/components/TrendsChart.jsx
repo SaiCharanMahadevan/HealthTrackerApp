@@ -2,6 +2,7 @@ import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallbac
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import apiService from '../services/api';
 import useAuth from '../hooks/useAuth';
+import { formatValue, formatLocalDateTime, formatLocalDate } from '../utils/formatters';
 
 // Format date for XAxis labels
 const formatXAxis = (tickItem) => {
@@ -11,6 +12,24 @@ const formatXAxis = (tickItem) => {
     } catch (e) {
         return tickItem; // Fallback
     }
+};
+
+// Custom Tooltip Content
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="custom-tooltip">
+        {/* Use formatLocalDate for the tooltip label */}
+        <p className="label">{`${formatLocalDate(label)}`}</p>
+        {payload.map((pld, index) => (
+          <p key={index} style={{ color: pld.color }}>
+            {`${pld.name}: ${formatValue(pld.value, 1, pld.unit || '')}`}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
 };
 
 // Wrap component with forwardRef
@@ -89,17 +108,14 @@ const TrendsChart = forwardRef((props, ref) => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#555" />
                     <XAxis 
                         dataKey="timestamp" 
-                        tickFormatter={formatXAxis} 
+                        tickFormatter={(timestamp) => formatLocalDate(timestamp)} 
                         stroke="#aaa" 
                         angle={-30} /* Angle ticks for better fit */
                         textAnchor="end"
                         height={50} /* Increase height for angled ticks */
                     />
                     <YAxis yAxisId="left" stroke="#8884d8" label={{ value: 'Weight (kg)', angle: -90, position: 'insideLeft', fill: '#8884d8' }} />
-                    <Tooltip 
-                        contentStyle={{ backgroundColor: '#333', border: '1px solid #555' }} 
-                        labelFormatter={(label) => formatXAxis(label)} 
-                    />
+                    <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Line yAxisId="left" type="monotone" dataKey="Weight" stroke="#8884d8" activeDot={{ r: 8 }} name="Weight (kg)" connectNulls />
                 </LineChart>
@@ -112,17 +128,14 @@ const TrendsChart = forwardRef((props, ref) => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#555" />
                     <XAxis 
                         dataKey="timestamp" 
-                        tickFormatter={formatXAxis} 
+                        tickFormatter={(timestamp) => formatLocalDate(timestamp)} 
                         stroke="#aaa" 
                         angle={-30} /* Angle ticks for better fit */
                         textAnchor="end"
                         height={50} /* Increase height for angled ticks */
                     />
                     <YAxis yAxisId="right" stroke="#82ca9d" label={{ value: 'Steps', angle: -90, position: 'insideLeft', fill: '#82ca9d' }}/>
-                    <Tooltip 
-                        contentStyle={{ backgroundColor: '#333', border: '1px solid #555' }} 
-                        labelFormatter={(label) => formatXAxis(label)}
-                    />
+                    <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Line yAxisId="right" type="monotone" dataKey="Steps" stroke="#82ca9d" activeDot={{ r: 8 }} name="Daily Steps" connectNulls />
                 </LineChart>

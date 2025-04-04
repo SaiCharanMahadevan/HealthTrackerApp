@@ -4,6 +4,7 @@ import EntryInput from '../components/EntryInput';
 import EntryList from '../components/EntryList';
 import WeeklySummaryDisplay from '../components/WeeklySummaryDisplay';
 import TrendsChart from '../components/TrendsChart';
+import DailySummaryDisplay from '../components/DailySummaryDisplay';
 
 const HomePage = () => {
     const { logout, user } = useAuth();
@@ -12,10 +13,12 @@ const HomePage = () => {
     // Create refs for report components
     const summaryRef = useRef();
     const trendsRef = useRef();
+    const dailySummaryRef = useRef();
 
     const triggerReportRefetch = () => {
         summaryRef.current?.refetch();
         trendsRef.current?.refetch();
+        dailySummaryRef.current?.refetch();
     };
 
     const handleEntryAdded = (newEntry) => {
@@ -49,7 +52,8 @@ const HomePage = () => {
             
             <section className="reports-section">
                 <h2>Reports</h2>
-                <div className="reports-grid">
+                <DailySummaryDisplay ref={dailySummaryRef} />
+                <div className="reports-grid" style={{marginTop: '2rem'}}>
                     <WeeklySummaryDisplay ref={summaryRef} />
                     <TrendsChart ref={trendsRef} />
                 </div>

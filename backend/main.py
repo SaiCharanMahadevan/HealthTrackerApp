@@ -6,7 +6,7 @@ from app.db.base import Base
 
 # --- Logging Configuration --- 
 logging.basicConfig(
-    level=logging.INFO, # Set the logging level (e.g., DEBUG, INFO, WARNING)
+    level=logging.DEBUG, # Set the logging level (e.g., DEBUG, INFO, WARNING)
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler("backend.log"), # Log to a file

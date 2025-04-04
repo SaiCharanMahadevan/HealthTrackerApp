@@ -106,6 +106,34 @@ const apiService = {
         return handleResponse(response);
     },
 
+    getDailySummary: async (token, targetDate = null) => {
+        const params = new URLSearchParams();
+        if (targetDate) {
+            params.append('target_date_str', targetDate); // Already YYYY-MM-DD
+        }
+        
+        // Get client's timezone offset in minutes (negative for east of UTC, positive for west)
+        // getTimezoneOffset() returns minutes difference between UTC and local time.
+        // e.g., SGT (UTC+8) is -480. We send this value directly.
+        const tzOffsetMinutes = new Date().getTimezoneOffset();
+        params.append('tz_offset_minutes', tzOffsetMinutes.toString());
+
+        const url = `${API_BASE_URL}/reports/summary/daily?${params.toString()}`;
+        console.log(`Fetching daily summary from: ${url}`); // Log the URL with params
+
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+            console.error('Failed to fetch daily summary:', errorData);
+            throw new Error(errorData.detail || 'Failed to fetch daily summary');
+        }
+        return response.json();
+    },
+
     getTrends: async (token, startDate = null, endDate = null) => {
         let url = `${API_BASE_URL}/reports/trends`;
         const params = new URLSearchParams();
