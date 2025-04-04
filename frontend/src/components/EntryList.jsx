@@ -43,49 +43,121 @@ const displayParsedData = (entry) => {
     }
 };
 
-
-const EntryList = ({ entries, setEntries }) => { // Receive entries and setter from parent
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+const EntryList = ({ entries, setEntries, onEntryUpdated, onEntryDeleted }) => {
+    const [listLoading, setListLoading] = useState(false); // Renamed loading state
+    const [listError, setListError] = useState(null); // Renamed error state
     const { token } = useAuth();
+
+    // State for inline editing
+    const [editingEntryId, setEditingEntryId] = useState(null);
+    const [editText, setEditText] = useState('');
+    const [editLoading, setEditLoading] = useState(false);
+    const [editError, setEditError] = useState(null);
 
     useEffect(() => {
         const fetchEntries = async () => {
-            if (!token) return; // Don't fetch if not logged in
-            setLoading(true);
-            setError(null);
+            if (!token) return;
+            setListLoading(true);
+            setListError(null);
             try {
                 const fetchedEntries = await apiService.getEntries(token);
-                // Sort entries by timestamp, newest first
                 fetchedEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                setEntries(fetchedEntries); 
+                setEntries(fetchedEntries);
             } catch (err) {
-                setError(err.message || 'Failed to fetch entries.');
+                setListError(err.message || 'Failed to fetch entries.');
                 console.error(err);
             } finally {
-                setLoading(false);
+                setListLoading(false);
             }
         };
-
         fetchEntries();
-    }, [token, setEntries]); // Re-fetch if token changes
+    }, [token, setEntries]);
 
-    if (loading) {
-        return <p>Loading entries...</p>;
-    }
+    const handleDelete = async (entryId) => {
+        if (!window.confirm("Are you sure you want to delete this entry?")) {
+            return;
+        }
+        try {
+            await apiService.deleteEntry(entryId, token);
+            onEntryDeleted(entryId); // Notify parent to update state
+        } catch (err) {
+            console.error("Delete failed:", err);
+            setListError(err.message || 'Failed to delete entry.'); // Show error related to the list
+        }
+    };
 
-    if (error) {
-        return <p className="error-message">Error loading entries: {error}</p>;
-    }
+    const handleEditClick = (entry) => {
+        setEditingEntryId(entry.id);
+        setEditText(entry.entry_text);
+        setEditError(null); // Clear previous edit errors
+    };
+
+    const handleCancel = () => {
+        setEditingEntryId(null);
+        setEditText('');
+        setEditError(null);
+    };
+
+    const handleSave = async (entryId) => {
+        if (!editText.trim() || !token) {
+            setEditError('Entry text cannot be empty.');
+            return;
+        }
+        setEditLoading(true);
+        setEditError(null);
+        try {
+            const updatedEntry = await apiService.updateEntry(entryId, { entry_text: editText }, token);
+            onEntryUpdated(updatedEntry); // Notify parent to update state
+            handleCancel(); // Close edit form
+        } catch (err) {
+            console.error("Update failed:", err);
+            setEditError(err.message || 'Failed to update entry.');
+        } finally {
+            setEditLoading(false);
+        }
+    };
+
+    if (listLoading) return <p>Loading entries...</p>;
+    if (listError) return <p className="error-message">Error: {listError}</p>;
 
     return (
-        <div className="entry-list-card"> {/* Style container */} 
+        <div className="entry-list-card"> 
             {entries.length > 0 ? (
                 <ul>
                     {entries.map((entry) => (
                         <li key={entry.id}>
                             <strong>{new Date(entry.timestamp).toLocaleString()}:</strong>
-                            <div className="entry-content">{displayParsedData(entry)}</div>
+                            {editingEntryId === entry.id ? (
+                                <div className="edit-form"> {/* Inline Edit Form */} 
+                                    <textarea
+                                        rows="3"
+                                        value={editText}
+                                        onChange={(e) => setEditText(e.target.value)}
+                                        disabled={editLoading}
+                                    />
+                                    {editError && <p className="error-message">{editError}</p>}
+                                    <div className="edit-actions">
+                                        <button onClick={() => handleSave(entry.id)} disabled={editLoading}>
+                                            {editLoading ? 'Saving...' : 'Save'}
+                                        </button>
+                                        <button onClick={handleCancel} disabled={editLoading} className="button-cancel">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <> {/* Display View */} 
+                                    <div className="entry-content">{displayParsedData(entry)}</div>
+                                    <div className="entry-actions">
+                                        <button onClick={() => handleEditClick(entry)} className="button-edit">
+                                            Edit
+                                        </button>
+                                        <button onClick={() => handleDelete(entry.id)} className="button-delete">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </li>
                     ))}
                 </ul>

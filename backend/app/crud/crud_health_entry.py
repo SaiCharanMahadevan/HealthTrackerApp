@@ -1,47 +1,121 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
+from fastapi import HTTPException
 from datetime import date, timedelta, datetime
 # Import Optional and List from typing for compatibility with Python < 3.10
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
+import json # Import json for parsing if needed
+import logging # Import logging
 
 from app.crud.base import CRUDBase
 from app.models.health_entry import HealthEntry
-from app.schemas.health_entry import HealthEntryCreate
+from app.schemas.health_entry import HealthEntryCreate, HealthEntryUpdate
 from app.schemas.report import WeeklySummary, TrendDataPoint, TrendReport # Import new schemas
+from app.services.llm_parser import parse_health_entry_text # Import parser
 
+# Get a logger instance for this module
+logger = logging.getLogger(__name__)
 
-class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryCreate]):
+def _recalculate_food_totals(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Recalculates totals based on items list if type is food."""
+    if not isinstance(parsed_data, dict) or 'items' not in parsed_data or not isinstance(parsed_data['items'], list):
+        logger.warning("Cannot recalculate totals: Invalid items structure in parsed_data")
+        return parsed_data # Return original if structure is wrong
+    
+    total_calories = 0
+    total_protein = 0
+    total_carbs = 0
+    total_fat = 0
+    
+    for item in parsed_data['items']:
+        if not isinstance(item, dict): continue # Skip invalid items
+        try:
+            # Check if amount is specified directly
+            if 'specified_amount' in item:
+                # Use nutrition values directly as they are for the total amount
+                # Quantity is assumed to be 1 in this case (as per new prompt)
+                total_calories += float(item.get('calories', 0))
+                total_protein += float(item.get('protein_g', 0))
+                total_carbs += float(item.get('carbs_g', 0))
+                total_fat += float(item.get('fat_g', 0))
+            else:
+                # Otherwise, assume nutrition is per item and multiply by quantity
+                qty = float(item.get('quantity', 1))
+                total_calories += qty * float(item.get('calories', 0))
+                total_protein += qty * float(item.get('protein_g', 0))
+                total_carbs += qty * float(item.get('carbs_g', 0))
+                total_fat += qty * float(item.get('fat_g', 0))
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Could not process item during recalculation: {item}. Error: {e}")
+            continue # Skip item if values aren't numeric
+    
+    # Overwrite totals in the dictionary
+    parsed_data['total_calories'] = round(total_calories)
+    parsed_data['total_protein_g'] = round(total_protein, 1)
+    parsed_data['total_carbs_g'] = round(total_carbs, 1)
+    parsed_data['total_fat_g'] = round(total_fat, 1)
+    
+    logger.info(f"Recalculated food totals: Cals={parsed_data['total_calories']}, P={parsed_data['total_protein_g']}")
+    return parsed_data
+
+class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate]):
     def create_with_owner(
         self,
         db: Session,
         *,
         obj_in: HealthEntryCreate,
         owner_id: int,
-        parsed_result: Optional[Dict[str, Any]] = None
+        parsed_result: Dict[str, Any] # Expect dict from parser
     ) -> HealthEntry:
-        """Create a new health entry, potentially including parsed data."""
-        obj_in_data = obj_in.dict()
-        db_obj = self.model(**obj_in_data, owner_id=owner_id)
+        logger.info(f"Creating health entry for owner {owner_id} with text: '{obj_in.entry_text[:50]}...'")
+        
+        # --- Handle Parser Result --- 
+        entry_type = parsed_result.get("type", "unknown")
+        value = None
+        unit = None
+        final_parsed_data_to_save = None
+        
+        if entry_type == "error":
+            logger.error(f"LLM parser returned error for user {owner_id}, text: '{obj_in.entry_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
+            entry_type = "unknown" # Save as unknown if parser had an error
+            # Keep value/unit as None, save original LLM output if available
+            final_parsed_data_to_save = parsed_result.get('original_llm_output') or parsed_result
+        elif entry_type == "unknown":
+            logger.warning(f"LLM parser returned 'unknown' for user {owner_id}, text: '{obj_in.entry_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
+            # Keep value/unit as None, save original LLM output if available
+            final_parsed_data_to_save = parsed_result.get('original_llm_output') or parsed_result
+        else: # Valid type found (food, weight, steps) - extract data
+            value = parsed_result.get("value")
+            unit = parsed_result.get("unit")
+            if entry_type == 'food':
+                food_data = parsed_result.get('parsed_data')
+                # --- Recalculate totals --- 
+                recalculated_food_data = _recalculate_food_totals(food_data)
+                final_parsed_data_to_save = recalculated_food_data
+            else:
+                final_parsed_data_to_save = parsed_result
 
-        # If parsed data is provided, populate the structured fields
-        if parsed_result:
-            db_obj.entry_type = parsed_result.get('type')
-            db_obj.parsed_data = parsed_result # Store the full JSON
-            # Store top-level value/unit if applicable (for weight/steps)
-            if db_obj.entry_type in ['weight', 'steps']:
-                db_obj.value = parsed_result.get('value')
-                db_obj.unit = parsed_result.get('unit')
-
+        # --- Create DB Object --- 
+        db_obj = HealthEntry(
+            entry_text=obj_in.entry_text, # Get text from input schema
+            owner_id=owner_id,
+            entry_type=entry_type,
+            value=value,
+            unit=unit,
+            parsed_data=final_parsed_data_to_save # Store potentially complex structure or fallback
+        )
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
+        logger.info(f"Health entry created with id {db_obj.id}, type '{db_obj.entry_type}'")
         return db_obj
 
     def get_multi_by_owner(
         self, db: Session, *, owner_id: int, skip: int = 0, limit: int = 100
     ) -> List[HealthEntry]:
         """Retrieve multiple health entries belonging to a specific owner."""
-        return (
+        logger.info(f"Getting health entries for owner {owner_id}, skip: {skip}, limit: {limit}")
+        entries = (
             db.query(self.model)
             .filter(HealthEntry.owner_id == owner_id)
             .order_by(HealthEntry.timestamp.desc()) # Keep order consistent
@@ -49,12 +123,94 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryCreate
             .limit(limit)
             .all()
         )
+        logger.info(f"Found {len(entries)} health entries for owner {owner_id}")
+        return entries
+
+    def update(
+        self,
+        db: Session,
+        *,
+        db_obj: HealthEntry,
+        obj_in: Union[HealthEntryUpdate, dict[str, Any]]
+    ) -> HealthEntry:
+        if isinstance(obj_in, dict):
+            new_text = obj_in.get("entry_text")
+        else:
+            new_text = obj_in.entry_text
+
+        if new_text is None:
+             logger.warning(f"Update called for Entry ID {db_obj.id} without new text. No update performed.")
+             return db_obj # Return original object if no text provided
+
+        # --- Re-parse the updated text --- 
+        logger.info(f"Updating Entry ID: {db_obj.id}. Parsing new text: '{new_text[:50]}...'") 
+        parsed_result = parse_health_entry_text(new_text)
+        logger.info(f"Parser result for Entry ID {db_obj.id}: {parsed_result}")
+
+        # --- Handle Parser Result --- 
+        entry_type = parsed_result.get("type", "unknown")
+        value = None
+        unit = None
+        final_parsed_data_to_save = None
+        
+        if entry_type == "error":
+            logger.error(f"LLM parser returned error during update for Entry ID {db_obj.id}, text: '{new_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
+            entry_type = "unknown"
+            final_parsed_data_to_save = parsed_result.get('original_llm_output') or parsed_result
+        elif entry_type == "unknown":
+            logger.warning(f"LLM parser returned 'unknown' during update for Entry ID {db_obj.id}, text: '{new_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
+            final_parsed_data_to_save = parsed_result.get('original_llm_output') or parsed_result
+        else: # Valid type
+            value = parsed_result.get("value")
+            unit = parsed_result.get("unit")
+            if entry_type == 'food':
+                food_data = parsed_result.get('parsed_data')
+                # --- Recalculate totals --- 
+                recalculated_food_data = _recalculate_food_totals(food_data)
+                final_parsed_data_to_save = recalculated_food_data
+            else:
+                final_parsed_data_to_save = parsed_result
+
+        # --- Prepare update data dictionary --- 
+        update_data = {
+            "entry_text": new_text,
+            "entry_type": entry_type,
+            "value": value,
+            "unit": unit,
+            "parsed_data": final_parsed_data_to_save,
+            "timestamp": datetime.utcnow()
+        }
+        
+        logger.info(f"Saving update data for Entry ID {db_obj.id}: {{entry_type='{update_data['entry_type']}', value='{update_data['value']}'}} ...")
+        
+        # Use the base class update method
+        updated_entry = super().update(db, db_obj=db_obj, obj_in=update_data)
+        logger.info(f"Update complete for Entry ID: {db_obj.id}")
+        return updated_entry
+
+    def remove(self, db: Session, *, id: int, user_id: int) -> Optional[HealthEntry]:
+        logger.info(f"Attempting to remove HealthEntry {id} for user {user_id}")
+        # First, get the object to ensure it exists and belongs to the user
+        obj = db.query(self.model).get(id)
+        if not obj:
+            logger.warning(f"Removal failed: HealthEntry {id} not found.")
+            return None # Or raise HTTPException(status_code=404, detail="Entry not found")
+        if obj.owner_id != user_id:
+            logger.warning(f"Auth failure: User {user_id} attempted to remove HealthEntry {id} owned by {obj.owner_id}.")
+            # Raise forbidden error even if found, to prevent leaking info
+            raise HTTPException(status_code=403, detail="Not authorized to delete this entry") 
+            
+        db.delete(obj)
+        db.commit()
+        logger.info(f"Successfully removed HealthEntry {id} for user {user_id}")
+        return obj # Return the deleted object (optional)
 
     # --- Reporting Functions --- 
     
     def get_weekly_summary(
         self, db: Session, *, user_id: int, target_date: date
     ) -> WeeklySummary:
+        logger.info(f"Generating weekly summary for user {user_id}, week of {target_date}")
         # Determine start (Monday) and end (Sunday) of the target week
         start_of_week = target_date - timedelta(days=target_date.weekday())
         end_of_week = start_of_week + timedelta(days=6)
@@ -136,12 +292,13 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryCreate
             avg_daily_steps=steps_aggregates.avg_daily_steps if steps_aggregates else None,
             total_steps=int(steps_aggregates.total_steps) if steps_aggregates and steps_aggregates.total_steps is not None else None,
         )
+        logger.info(f"Weekly summary generated for user {user_id}, week {start_of_week} to {end_of_week}")
         return summary
 
     def get_trends(
         self, db: Session, *, user_id: int, start_date: date, end_date: date
     ) -> TrendReport:
-        
+        logger.info(f"Generating trends report for user {user_id}, from {start_date} to {end_date}")
         # Weight Trends
         weight_data = db.query(HealthEntry.timestamp, HealthEntry.value).filter(
             HealthEntry.owner_id == user_id,
@@ -173,6 +330,7 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryCreate
             weight_trends=weight_trends,
             steps_trends=steps_trends
         )
+        logger.info(f"Trends report generated for user {user_id}, found {len(weight_trends)} weight points, {len(steps_trends)} steps points")
         return report
 
 

@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 
 # Shared properties
@@ -11,9 +12,9 @@ class UserCreate(UserBase):
     password: str
 
 
-# Properties to receive via API on update (optional, can add later)
+# Properties to receive via API on update - REMOVING THIS
 # class UserUpdate(UserBase):
-#     password: str | None = None
+#     password: Optional[str] = None
 
 
 # Properties shared by models stored in DB
@@ -23,7 +24,7 @@ class UserInDBBase(UserBase):
 
     class Config:
         orm_mode = True  # Pydantic V1
-        # from_attributes = True # Pydantic V2
+        from_attributes = True  # Pydantic V2
 
 
 # Properties to return to client
@@ -31,6 +32,6 @@ class User(UserInDBBase):
     pass
 
 
-# Properties stored in DB
+# Additional properties stored in DB
 class UserInDB(UserInDBBase):
     hashed_password: str 

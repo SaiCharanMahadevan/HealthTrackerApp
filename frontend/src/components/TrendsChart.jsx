@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import apiService from '../services/api';
 import useAuth from '../hooks/useAuth';
@@ -13,53 +13,59 @@ const formatXAxis = (tickItem) => {
     }
 };
 
-const TrendsChart = () => {
-    const [trendData, setTrendData] = useState({ weight: [], steps: [] });
+// Wrap component with forwardRef
+const TrendsChart = forwardRef((props, ref) => {
+    const [trendData, setTrendData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const { token } = useAuth();
 
+    // Extract fetch logic into a useCallback function
+    const fetchTrends = useCallback(async () => {
+        if (!token) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await apiService.getTrends(token);
+            
+            // Transform data for Recharts
+            const formattedWeight = data.weight_trends.map(p => ({ 
+                timestamp: p.timestamp,
+                date: new Date(p.timestamp).toISOString().split('T')[0],
+                Weight: p.value 
+            }));
+            const formattedSteps = data.steps_trends.map(p => ({ 
+                timestamp: p.timestamp,
+                date: new Date(p.timestamp).toISOString().split('T')[0],
+                Steps: p.value 
+            }));
+
+            // Combine and sort
+            const combinedDataMap = new Map();
+            formattedWeight.forEach(p => combinedDataMap.set(p.date, { ...combinedDataMap.get(p.date), timestamp: p.timestamp, date: p.date, Weight: p.Weight }));
+            formattedSteps.forEach(p => combinedDataMap.set(p.date, { ...combinedDataMap.get(p.date), timestamp: p.timestamp, date: p.date, Steps: p.Steps }));
+            const combinedData = Array.from(combinedDataMap.values()).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            setTrendData(combinedData);
+
+        } catch (err) {
+            setError(err.message || 'Failed to fetch trend data.');
+            console.error(err);
+            setTrendData([]); // Clear data on error
+        } finally {
+            setLoading(false);
+        }
+    }, [token]); // Dependency: token
+
+    // Initial fetch on mount
     useEffect(() => {
-        const fetchTrends = async () => {
-            if (!token) return;
-            setLoading(true);
-            setError(null);
-            try {
-                // Fetch trends for the default period (last 30 days)
-                const data = await apiService.getTrends(token);
-                
-                // Transform data for Recharts (needs a common key, e.g., timestamp string)
-                const formattedWeight = data.weight_trends.map(p => ({ 
-                    timestamp: p.timestamp, // Keep original for potential sorting/tooltips
-                    date: new Date(p.timestamp).toISOString().split('T')[0], // Use date string as key
-                    Weight: p.value 
-                }));
-                const formattedSteps = data.steps_trends.map(p => ({ 
-                    timestamp: p.timestamp, 
-                    date: new Date(p.timestamp).toISOString().split('T')[0], 
-                    Steps: p.value 
-                }));
-
-                // Combine data based on date for charting (Recharts prefers single array)
-                // This is a simplified merge, might need refinement if dates don't align perfectly
-                const combinedDataMap = new Map();
-                formattedWeight.forEach(p => combinedDataMap.set(p.date, { ...combinedDataMap.get(p.date), timestamp: p.timestamp, date: p.date, Weight: p.Weight }));
-                formattedSteps.forEach(p => combinedDataMap.set(p.date, { ...combinedDataMap.get(p.date), timestamp: p.timestamp, date: p.date, Steps: p.Steps }));
-                
-                // Sort combined data by timestamp before setting state
-                const combinedData = Array.from(combinedDataMap.values()).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-                setTrendData(combinedData);
-
-            } catch (err) {
-                setError(err.message || 'Failed to fetch trend data.');
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchTrends();
-    }, [token]);
+    }, [fetchTrends]);
+
+    // Expose the refetch function via useImperativeHandle
+    useImperativeHandle(ref, () => ({ 
+        refetch: fetchTrends
+    }));
 
     if (loading) {
         return <p>Loading trend charts...</p>;
@@ -123,6 +129,6 @@ const TrendsChart = () => {
             </ResponsiveContainer>
         </div>
     );
-};
+});
 
 export default TrendsChart; 

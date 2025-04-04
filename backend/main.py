@@ -1,7 +1,22 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.session import engine
 from app.db.base import Base
+
+# --- Logging Configuration --- 
+logging.basicConfig(
+    level=logging.INFO, # Set the logging level (e.g., DEBUG, INFO, WARNING)
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("backend.log"), # Log to a file
+        logging.StreamHandler() # Also log to console (optional, remove if only file needed)
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+logger.info("Starting Health Tracker application...")
 
 # Create database tables (This is simple for development, consider Alembic for migrations)
 Base.metadata.create_all(bind=engine) # Uncommented for initial setup

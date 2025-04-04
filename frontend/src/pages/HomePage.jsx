@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import useAuth from '../hooks/useAuth';
 import EntryInput from '../components/EntryInput';
 import EntryList from '../components/EntryList';
@@ -9,8 +9,32 @@ const HomePage = () => {
     const { logout, user } = useAuth();
     const [entries, setEntries] = useState([]);
 
+    // Create refs for report components
+    const summaryRef = useRef();
+    const trendsRef = useRef();
+
+    const triggerReportRefetch = () => {
+        summaryRef.current?.refetch();
+        trendsRef.current?.refetch();
+    };
+
     const handleEntryAdded = (newEntry) => {
         setEntries(prevEntries => [newEntry, ...prevEntries]);
+        triggerReportRefetch(); // Trigger refetch
+    };
+
+    // Callback for EntryList to update the state after successful edit
+    const handleEntryUpdated = (updatedEntry) => {
+        setEntries(prevEntries => prevEntries.map(entry => 
+            entry.id === updatedEntry.id ? updatedEntry : entry
+        ));
+        triggerReportRefetch(); // Trigger refetch
+    };
+
+    // Callback for EntryList to update the state after successful delete
+    const handleEntryDeleted = (deletedEntryId) => {
+        setEntries(prevEntries => prevEntries.filter(entry => entry.id !== deletedEntryId));
+        triggerReportRefetch(); // Trigger refetch
     };
 
     return (
@@ -26,8 +50,8 @@ const HomePage = () => {
             <section className="reports-section">
                 <h2>Reports</h2>
                 <div className="reports-grid">
-                    <WeeklySummaryDisplay />
-                    <TrendsChart />
+                    <WeeklySummaryDisplay ref={summaryRef} />
+                    <TrendsChart ref={trendsRef} />
                 </div>
             </section>
 
@@ -39,7 +63,12 @@ const HomePage = () => {
                 
                 <section className="view-entry-section">
                     <h2>Your Entries:</h2>
-                    <EntryList entries={entries} setEntries={setEntries} />
+                    <EntryList 
+                        entries={entries} 
+                        setEntries={setEntries} 
+                        onEntryUpdated={handleEntryUpdated}
+                        onEntryDeleted={handleEntryDeleted}
+                    />
                 </section>
             </main>
         </div>

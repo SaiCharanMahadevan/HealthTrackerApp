@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import apiService from '../services/api';
 import useAuth from '../hooks/useAuth';
 
@@ -7,30 +7,35 @@ const formatValue = (value, decimals = 1) => {
     return parseFloat(value).toFixed(decimals);
 };
 
-const WeeklySummaryDisplay = () => {
+const WeeklySummaryDisplay = forwardRef((props, ref) => {
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const { token } = useAuth();
 
-    useEffect(() => {
-        const fetchSummary = async () => {
-            if (!token) return;
-            setLoading(true);
-            setError(null);
-            try {
-                // Fetch summary for the current week (no date specified)
-                const data = await apiService.getWeeklySummary(token);
-                setSummary(data);
-            } catch (err) {
-                setError(err.message || 'Failed to fetch weekly summary.');
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchSummary();
+    const fetchSummary = useCallback(async () => {
+        if (!token) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await apiService.getWeeklySummary(token);
+            setSummary(data);
+        } catch (err) {
+            setError(err.message || 'Failed to fetch weekly summary.');
+            console.error(err);
+            setSummary(null);
+        } finally {
+            setLoading(false);
+        }
     }, [token]);
+
+    useEffect(() => {
+        fetchSummary();
+    }, [fetchSummary]);
+
+    useImperativeHandle(ref, () => ({ 
+        refetch: fetchSummary
+    }));
 
     if (loading) {
         return <p>Loading weekly summary...</p>;
@@ -58,6 +63,6 @@ const WeeklySummaryDisplay = () => {
             </div>
         </div>
     );
-};
+});
 
 export default WeeklySummaryDisplay; 

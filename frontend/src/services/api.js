@@ -13,17 +13,25 @@ const apiClient = axios.create({
 });
 
 const handleResponse = async (response) => {
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        console.error('API Error:', errorData);
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    // Check for 204 No Content before trying to parse JSON
+    if (response.status === 204) {
+        return {}; // Or return null, depends on how you want to handle it downstream
     }
-    // Handle cases where response might be empty (e.g., 204 No Content)
+
+    // For other non-OK responses, try to parse error details
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: `HTTP error! Status: ${response.status}` }));
+        console.error('API Error:', errorData);
+        throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
+    }
+
+    // For successful responses with content, parse JSON
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") !== -1) {
         return response.json();
     } else {
-        return {}; // Return empty object or handle as needed
+        // Handle successful responses that aren't JSON (if any are expected)
+        return {}; 
     }
 };
 
@@ -118,6 +126,30 @@ const apiService = {
             },
         });
         return handleResponse(response);
+    },
+
+    updateEntry: async (entryId, entryData, token) => {
+        const response = await fetch(`${API_BASE_URL}/entries/${entryId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(entryData), // Expects e.g., { entry_text: "new text" }
+        });
+        return handleResponse(response);
+    },
+
+    deleteEntry: async (entryId, token) => {
+        const response = await fetch(`${API_BASE_URL}/entries/${entryId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        // DELETE often returns 204 No Content, handleResponse handles this
+        // It might throw an error for non-2xx responses which we catch in the component
+        return handleResponse(response); 
     },
 };
 
