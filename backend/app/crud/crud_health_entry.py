@@ -12,6 +12,7 @@ from app.models.health_entry import HealthEntry
 from app.schemas.health_entry import HealthEntryCreate, HealthEntryUpdate
 from app.schemas.report import WeeklySummary, TrendDataPoint, TrendReport # Import new schemas
 from app.services.llm_parser import parse_health_entry_text # Import parser
+from app.services.food_data_service import get_nutrition_from_off # Import OFF service
 
 # Get a logger instance for this module
 logger = logging.getLogger(__name__)
@@ -67,33 +68,73 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
         owner_id: int,
         parsed_result: Dict[str, Any] # Expect dict from parser
     ) -> HealthEntry:
-        logger.info(f"Creating health entry for owner {owner_id} with text: '{obj_in.entry_text[:50]}...'")
-        
-        # --- Handle Parser Result --- 
+        logger.info(f"Processing create for owner {owner_id}, text: '{obj_in.entry_text[:50]}...'")
         entry_type = parsed_result.get("type", "unknown")
         value = None
         unit = None
-        final_parsed_data_to_save = None
-        
-        if entry_type == "error":
+        final_parsed_data_to_save = parsed_result # Start with original parsed data
+
+        if entry_type == "error" or entry_type == "unknown":
             logger.error(f"LLM parser returned error for user {owner_id}, text: '{obj_in.entry_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
-            entry_type = "unknown" # Save as unknown if parser had an error
-            # Keep value/unit as None, save original LLM output if available
+            entry_type = "unknown"
             final_parsed_data_to_save = parsed_result.get('original_llm_output') or parsed_result
-        elif entry_type == "unknown":
-            logger.warning(f"LLM parser returned 'unknown' for user {owner_id}, text: '{obj_in.entry_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
-            # Keep value/unit as None, save original LLM output if available
-            final_parsed_data_to_save = parsed_result.get('original_llm_output') or parsed_result
-        else: # Valid type found (food, weight, steps) - extract data
-            value = parsed_result.get("value")
-            unit = parsed_result.get("unit")
-            if entry_type == 'food':
-                food_data = parsed_result.get('parsed_data')
-                # --- Recalculate totals --- 
+        
+        elif entry_type == 'food':
+            food_data = parsed_result.get('parsed_data')
+            if isinstance(food_data, dict) and 'items' in food_data and isinstance(food_data['items'], list):
+                processed_items = []
+                for item in food_data['items']:
+                    if not isinstance(item, dict): continue
+                    item_name = item.get('item')
+                    item['nutrition_source'] = 'LLM Estimate' # Default source
+                    
+                    if item_name:
+                        # --- Attempt OFF Lookup --- 
+                        off_data = get_nutrition_from_off(item_name)
+                        if off_data:
+                            logger.info(f"Using OFF data for item: {item_name}")
+                            item['nutrition_source'] = off_data['source']
+                            # Scaling logic (Initial simple version: only handles grams)
+                            scaling_factor = None
+                            amount = item.get('specified_amount')
+                            amount_unit = item.get('specified_unit')
+                            if amount is not None and amount_unit and amount_unit.lower() == 'g':
+                                try:
+                                    scaling_factor = float(amount) / 100.0
+                                except (ValueError, TypeError):
+                                    logger.warning(f"Could not determine scaling factor for {amount}{amount_unit} of {item_name}")
+                            
+                            if scaling_factor is not None:
+                                try:
+                                    # Overwrite LLM estimates with scaled OFF data
+                                    item['calories'] = round(off_data['calories_100g'] * scaling_factor)
+                                    item['protein_g'] = round(off_data['protein_100g'] * scaling_factor, 1)
+                                    item['carbs_g'] = round(off_data['carbs_100g'] * scaling_factor, 1)
+                                    item['fat_g'] = round(off_data['fat_100g'] * scaling_factor, 1)
+                                    logger.info(f"Applied scaled OFF data for {item_name}")
+                                except Exception as e:
+                                    logger.error(f"Error applying scaled OFF data for {item_name}: {e}", exc_info=False)
+                                    # Fallback: Keep LLM estimates if scaling fails
+                            else:
+                                logger.info(f"Could not scale OFF data for {item_name}, using LLM estimates.")
+                        else:
+                            logger.info(f"No usable OFF data found for {item_name}, using LLM estimates.")
+                    processed_items.append(item) # Add item (potentially updated)
+                
+                food_data['items'] = processed_items # Update items list
+                # --- Recalculate totals using potentially updated items --- 
                 recalculated_food_data = _recalculate_food_totals(food_data)
                 final_parsed_data_to_save = recalculated_food_data
             else:
-                final_parsed_data_to_save = parsed_result
+                # Handle case where parsed_data is missing items etc.
+                logger.warning(f"Invalid food data structure from LLM for text: '{obj_in.entry_text[:50]}...'")
+                entry_type = "unknown" # Fallback to unknown
+                final_parsed_data_to_save = food_data # Save what we got
+                
+        else: # weight, steps - handled by base fields
+            value = parsed_result.get("value")
+            unit = parsed_result.get("unit")
+            final_parsed_data_to_save = parsed_result # Save original parser result
 
         # --- Create DB Object --- 
         db_obj = HealthEntry(
@@ -151,26 +192,52 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
         entry_type = parsed_result.get("type", "unknown")
         value = None
         unit = None
-        final_parsed_data_to_save = None
-        
-        if entry_type == "error":
+        final_parsed_data_to_save = parsed_result # Start with original
+
+        if entry_type == "error" or entry_type == "unknown":
             logger.error(f"LLM parser returned error during update for Entry ID {db_obj.id}, text: '{new_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
             entry_type = "unknown"
             final_parsed_data_to_save = parsed_result.get('original_llm_output') or parsed_result
-        elif entry_type == "unknown":
-            logger.warning(f"LLM parser returned 'unknown' during update for Entry ID {db_obj.id}, text: '{new_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
-            final_parsed_data_to_save = parsed_result.get('original_llm_output') or parsed_result
-        else: # Valid type
-            value = parsed_result.get("value")
-            unit = parsed_result.get("unit")
-            if entry_type == 'food':
-                food_data = parsed_result.get('parsed_data')
-                # --- Recalculate totals --- 
+       
+        elif entry_type == 'food':
+            food_data = parsed_result.get('parsed_data')
+            if isinstance(food_data, dict) and 'items' in food_data and isinstance(food_data['items'], list):
+                processed_items = []
+                for item in food_data['items']:
+                    if not isinstance(item, dict): continue
+                    item_name = item.get('item')
+                    item['nutrition_source'] = 'LLM Estimate' 
+                    if item_name:
+                        off_data = get_nutrition_from_off(item_name)
+                        if off_data:
+                            item['nutrition_source'] = off_data['source']
+                            scaling_factor = None
+                            amount = item.get('specified_amount')
+                            amount_unit = item.get('specified_unit')
+                            if amount is not None and amount_unit and amount_unit.lower() == 'g':
+                                try: scaling_factor = float(amount) / 100.0
+                                except: pass
+                            if scaling_factor is not None:
+                                try:
+                                    item['calories'] = round(off_data['calories_100g'] * scaling_factor)
+                                    item['protein_g'] = round(off_data['protein_100g'] * scaling_factor, 1)
+                                    item['carbs_g'] = round(off_data['carbs_100g'] * scaling_factor, 1)
+                                    item['fat_g'] = round(off_data['fat_100g'] * scaling_factor, 1)
+                                except Exception as e: pass
+                        processed_items.append(item)
+                food_data['items'] = processed_items
                 recalculated_food_data = _recalculate_food_totals(food_data)
                 final_parsed_data_to_save = recalculated_food_data
             else:
-                final_parsed_data_to_save = parsed_result
-
+                logger.warning(f"Invalid food data structure during update for Entry ID {db_obj.id}")
+                entry_type = "unknown"
+                final_parsed_data_to_save = food_data
+                
+        else: # weight, steps
+            value = parsed_result.get("value")
+            unit = parsed_result.get("unit")
+            final_parsed_data_to_save = parsed_result
+                
         # --- Prepare update data dictionary --- 
         update_data = {
             "entry_text": new_text,
