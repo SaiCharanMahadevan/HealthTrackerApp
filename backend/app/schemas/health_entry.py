@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, List # Import Optional, List
 
 # Shared properties
 class HealthEntryBase(BaseModel):
-    entry_text: str
+    entry_text: Optional[str] = None # Make text optional if image is primary input
     target_date_str: Optional[str] = None # Add optional target date
     # Parsed fields are not in base, they are derived
 
@@ -32,6 +32,7 @@ class HealthEntryInDBBase(HealthEntryBase):
     value: Optional[float] = None
     unit: Optional[str] = None
     parsed_data: Optional[Dict[str, Any]] = None # Store parsed JSON details
+    image_url: Optional[str] = None # Add image_url here
 
     class Config:
         orm_mode = True # Changed from from_attributes=True for compatibility

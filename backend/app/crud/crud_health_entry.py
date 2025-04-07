@@ -66,12 +66,13 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
         db: Session,
         *,
         obj_in: HealthEntryCreate,
-        owner_id: int
+        owner_id: int,
+        image_data: Optional[bytes] = None
     ) -> HealthEntry:
-        logger.info(f"Attempting to create entry for user {owner_id}, text: '{obj_in.entry_text[:50]}...', target_date: {obj_in.target_date_str}")
+        logger.info(f"Attempting to create entry for user {owner_id}, text: '{obj_in.entry_text[:50] if obj_in.entry_text else '[No Text]' }...', target_date: {obj_in.target_date_str}, image: {bool(image_data)}")
         
-        # Parse the text using LLM service
-        parsed_result = parse_health_entry_text(obj_in.entry_text)
+        # Parse the text and/or image using LLM service
+        parsed_result = parse_health_entry_text(text=obj_in.entry_text, image_data=image_data)
         logger.debug(f"LLM Parse Result: {parsed_result}")
 
         # Determine timestamp
@@ -100,7 +101,8 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
             entry_type=parsed_result.get('type'),
             value=parsed_result.get('value'),
             unit=parsed_result.get('unit'),
-            parsed_data=parsed_result.get('parsed_data') or parsed_result
+            parsed_data=parsed_result.get('parsed_data') or parsed_result,
+            # image_url is set later in the API endpoint after saving
         )
         
         db.add(db_obj)

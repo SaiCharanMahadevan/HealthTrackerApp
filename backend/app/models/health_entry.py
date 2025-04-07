@@ -25,4 +25,6 @@ class HealthEntry(Base):
     # entry_type = Column(String, index=True)
     # value = Column(Float)
     # units = Column(String)
-    # parsed_data = Column(JSON) 
+    # parsed_data = Column(JSON)
+
+    image_url = Column(String, nullable=True) # Add image URL field 
