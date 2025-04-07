@@ -373,15 +373,19 @@ nav button:hover {
 
 .summary-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Responsive columns */
-    gap: 1rem;
+    /* Updated: Force 2 columns, let them take equal space */
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1.25rem; /* Slightly increase gap */
     font-size: 0.95em;
 }
 
+/* Keep styles for items inside the grid */
 .summary-grid div {
     background-color: #333;
-    padding: 0.8rem;
+    padding: 1rem; /* Increase padding slightly */
     border-radius: 5px;
+    /* Add min-height if needed for visual consistency */
+    /* min-height: 80px; */ 
 }
 
 .summary-grid strong {
@@ -673,3 +677,245 @@ nav button:hover {
      justify-content: space-between; /* Space out on smaller screens */
   }
 }
+
+/* === Form Styles (Login/Signup) === */
+.form-container {
+  max-width: 550px;
+  margin: 4rem auto;
+  padding: 2.5rem;
+  background-color: #3a3a3a;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  color: #eee;
+}
+
+.login-page-container h1,
+.signup-page-container h1 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #eee;
+}
+
+.form-group {
+  margin-bottom: 1rem; /* Slightly reduced margin */
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #ccc;
+}
+
+/* Refined Input Styles (Date + Text) */
+.form-input,
+.entry-form-card textarea {
+  width: 100%;
+  padding: 0.8rem 1rem; /* Adjusted padding */
+  border: 1px solid #555; /* Subtle border */
+  background-color: #444; /* Input background */
+  color: #eee;
+  border-radius: 6px; /* Slightly more rounded */
+  font-size: 1rem;
+  box-sizing: border-box; 
+  line-height: 1.4; /* Improve text readability */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Smooth transitions */
+}
+
+/* Specific styles for textarea in EntryForm */
+.entry-form-card textarea {
+    resize: vertical; /* Allow vertical resize only */
+    min-height: 80px; /* Set a minimum height */
+    font-family: inherit; /* Ensure consistent font */
+}
+
+/* Styling for the date picker group */
+.entry-form-date-picker {
+    /* Add specific styles if needed, e.g., alignment */
+    /* display: flex; align-items: center; gap: 1rem; */
+}
+
+.form-input:focus,
+.entry-form-card textarea:focus {
+  outline: none;
+  border-color: #4dabf7; /* Keep focus highlight */
+  box-shadow: 0 0 0 3px rgba(77, 171, 247, 0.25); /* Slightly softer focus shadow */
+}
+
+/* Remove specific background override if EntryForm card provides it */
+/* .entry-form-card input,
+.entry-form-card textarea {
+    background-color: #282c34; 
+} */
+
+/* Button Styles remain the same */
+.form-button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: #4dabf7;
+  color: #111;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-top: 1rem;
+}
+
+.form-button:hover {
+  background-color: #3b9ee0;
+}
+
+.form-container p {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: #ccc;
+}
+
+.form-container p a {
+  color: #4dabf7;
+  text-decoration: none;
+}
+
+.form-container p a:hover {
+  text-decoration: underline;
+}
+
+/* General Error Message Style */
+.error-message {
+  color: #f67280;
+  background-color: rgba(246, 114, 128, 0.1);
+  border: 1px solid rgba(246, 114, 128, 0.5);
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+/* === Navbar Styles === */
+.navbar {
+  background-color: #282c34; /* Dark background for navbar */
+  padding: 0.75rem 2rem; /* Vertical and horizontal padding */
+  color: #eee;
+  display: flex; /* Use Flexbox */
+  justify-content: space-between; /* Push brand left, links right */
+  align-items: center; /* Vertically center items */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  margin-bottom: 1.5rem; /* Space below navbar */
+}
+
+.navbar-brand a {
+  color: #61dafb; /* Accent color for brand */
+  font-weight: bold;
+  font-size: 1.4rem;
+  text-decoration: none;
+}
+
+.navbar-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex; /* Use Flexbox for links too */
+  align-items: center;
+}
+
+.navbar-links li {
+  margin-left: 1.5rem; /* Space between links */
+}
+
+.navbar-links a,
+.navbar-links button {
+  color: #eee;
+  text-decoration: none;
+  font-size: 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.3rem 0; /* Add slight vertical padding for click area */
+  transition: color 0.2s ease;
+}
+
+.navbar-links a:hover,
+.navbar-links button:hover {
+  color: #61dafb; /* Accent color on hover */
+}
+
+.logout-button {
+    font-weight: 500; /* Slightly bolder */
+}
+
+/* === Page Containers & Reports Page === */
+.page-container {
+    width: 100%; /* Ensure page containers try to use full width */
+    /* Inherits max-width from #root or .App */
+    padding: 0 1rem; /* Add some horizontal padding within pages */
+    box-sizing: border-box;
+}
+
+.reports-page .report-section {
+    background-color: #3a3a3a; /* Match card background */
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    margin-bottom: 2rem; /* Space between report sections */
+    width: 100%; /* Ensure sections take available width */
+    box-sizing: border-box;
+}
+
+.reports-page h2 { /* Overall Reports Page Title */
+    margin-bottom: 1.5rem;
+    text-align: center;
+    border-bottom: 1px solid #555;
+    padding-bottom: 0.75rem;
+}
+
+.reports-page .report-section h3 { /* Titles within sections */
+     margin-top: 0;
+     margin-bottom: 1.5rem;
+     color: #bbb;
+     border-bottom: 1px solid #555;
+     padding-bottom: 0.5rem;
+}
+
+/* ... Ensure TrendsChart and WeeklySummaryDisplay internal styles allow width usage ... */
+/* TrendsChart uses ResponsiveContainer width=100%, which is good */
+
+/* ... Other existing styles ... */
+
+/* === Loading Spinner Styles === */
+.spinner-container {
+  display: inline-flex; /* Better for inline usage like in buttons */
+  vertical-align: middle; /* Align nicely with button text */
+}
+
+@keyframes spinner-rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Default (Medium) Spinner */
+.loading-spinner {
+  width: 30px; /* Default size slightly smaller */
+  height: 30px;
+  border: 4px solid #555; 
+  border-bottom-color: #61dafb; 
+  border-radius: 50%;
+  display: inline-block; /* Keep inline-block */
+  box-sizing: border-box;
+  animation: spinner-rotation 1s linear infinite;
+}
+
+/* Small Spinner Variant */
+.loading-spinner.spinner-small {
+  width: 18px; /* Small size */
+  height: 18px;
+  border-width: 3px; /* Thinner border */
+  /* Animation and other styles inherited */
+}
+
+/* === Other styles ... */ 

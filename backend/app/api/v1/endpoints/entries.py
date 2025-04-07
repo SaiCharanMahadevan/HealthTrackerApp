@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import Any, List
 import logging # Import logging
 
 from app import crud, models, schemas
 from app.api import deps
-from app.services.llm_parser import parse_health_entry_text
 
 logger = logging.getLogger(__name__) # Get logger
 
@@ -13,42 +12,27 @@ router = APIRouter()
 
 
 @router.post("/", response_model=schemas.HealthEntry, status_code=201)
-def create_health_entry(
+def create_entry(
     *, # Enforce keyword arguments
     db: Session = Depends(deps.get_db),
-    entry_in: schemas.HealthEntryCreate,
+    entry_in: schemas.HealthEntryCreate, # Contains entry_text and target_date_str
     current_user: models.User = Depends(deps.get_current_active_user),
-    # background_tasks: BackgroundTasks # Inject BackgroundTasks if using
 ):
     """
-    Create new health entry, parse with LLM (synchronously for now),
-    and store structured data.
+    Create new health entry for the current user.
+    Parsing and timestamp logic handled by CRUD layer.
     """
-    logger.info(f"User {current_user.id} attempting to create entry with text: '{entry_in.entry_text[:50]}...'")
-    # 1. Initial save (optional, could save after parsing too)
-    # entry = crud.health_entry.create_with_owner(db=db, obj_in=entry_in, owner_id=current_user.id)
-
-    # 2. Parse text with LLM (synchronous call)
-    parsed_result = parse_health_entry_text(entry_in.entry_text)
-    print(f"Parsed result: {parsed_result}")
-
-    # 3. Save entry with parsed data
+    logger.info(f"API: User {current_user.id} attempting to create entry with text: '{entry_in.entry_text[:50]}...', date: {entry_in.target_date_str}")
+    
+    # Call CRUD function, which now handles parsing and timestamp generation
     entry = crud.health_entry.create_with_owner(
         db=db, 
-        obj_in=entry_in, 
-        owner_id=current_user.id,
-        parsed_result=parsed_result # Pass parsed data to CRUD
+        obj_in=entry_in, # Pass the input schema directly
+        owner_id=current_user.id
+        # No parsed_result needed here anymore
     )
-    logger.info(f"Entry {entry.id} created successfully for user {current_user.id}")
-
-    # --- Alternative: Using BackgroundTasks ---
-    # entry = crud.health_entry.create_with_owner(db=db, obj_in=entry_in, owner_id=current_user.id)
-    # background_tasks.add_task(process_entry_with_llm, db, entry.id)
-    # return entry # Return immediately, LLM runs in background
-    # --- End BackgroundTasks --- 
-
-    # If parsing failed, the entry is still saved but without structured data
-    # The response model will show nulls for those fields
+    # Logging is now handled within create_with_owner
+    
     return entry
 
 

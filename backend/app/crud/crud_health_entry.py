@@ -6,6 +6,7 @@ from datetime import date, timedelta, datetime, time, timezone
 from typing import Optional, List, Dict, Any, Union
 import json # Import json for parsing if needed
 import logging # Import logging
+from fastapi.encoders import jsonable_encoder
 
 from app.crud.base import CRUDBase
 from app.models.health_entry import HealthEntry
@@ -65,90 +66,47 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
         db: Session,
         *,
         obj_in: HealthEntryCreate,
-        owner_id: int,
-        parsed_result: Dict[str, Any] # Expect dict from parser
+        owner_id: int
     ) -> HealthEntry:
-        logger.info(f"Processing create for owner {owner_id}, text: '{obj_in.entry_text[:50]}...'")
-        entry_type = parsed_result.get("type", "unknown")
-        value = None
-        unit = None
-        final_parsed_data_to_save = parsed_result # Start with original parsed data
-
-        if entry_type == "error" or entry_type == "unknown":
-            logger.error(f"LLM parser returned error for user {owner_id}, text: '{obj_in.entry_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
-            entry_type = "unknown"
-            final_parsed_data_to_save = parsed_result.get('original_llm_output') or parsed_result
+        logger.info(f"Attempting to create entry for user {owner_id}, text: '{obj_in.entry_text[:50]}...', target_date: {obj_in.target_date_str}")
         
-        elif entry_type == 'food':
-            food_data = parsed_result.get('parsed_data')
-            if isinstance(food_data, dict) and 'items' in food_data and isinstance(food_data['items'], list):
-                processed_items = []
-                for item in food_data['items']:
-                    if not isinstance(item, dict): continue
-                    item_name = item.get('item')
-                    item['nutrition_source'] = 'LLM Estimate' # Default source
-                    
-                    if item_name:
-                        # --- Attempt OFF Lookup --- 
-                        off_data = get_nutrition_from_off(item_name)
-                        if off_data:
-                            logger.info(f"Using OFF data for item: {item_name}")
-                            item['nutrition_source'] = off_data['source']
-                            # Scaling logic (Initial simple version: only handles grams)
-                            scaling_factor = None
-                            amount = item.get('specified_amount')
-                            amount_unit = item.get('specified_unit')
-                            if amount is not None and amount_unit and amount_unit.lower() == 'g':
-                                try:
-                                    scaling_factor = float(amount) / 100.0
-                                except (ValueError, TypeError):
-                                    logger.warning(f"Could not determine scaling factor for {amount}{amount_unit} of {item_name}")
-                            
-                            if scaling_factor is not None:
-                                try:
-                                    # Overwrite LLM estimates with scaled OFF data
-                                    item['calories'] = round(off_data['calories_100g'] * scaling_factor)
-                                    item['protein_g'] = round(off_data['protein_100g'] * scaling_factor, 1)
-                                    item['carbs_g'] = round(off_data['carbs_100g'] * scaling_factor, 1)
-                                    item['fat_g'] = round(off_data['fat_100g'] * scaling_factor, 1)
-                                    logger.info(f"Applied scaled OFF data for {item_name}")
-                                except Exception as e:
-                                    logger.error(f"Error applying scaled OFF data for {item_name}: {e}", exc_info=False)
-                                    # Fallback: Keep LLM estimates if scaling fails
-                            else:
-                                logger.info(f"Could not scale OFF data for {item_name}, using LLM estimates.")
-                        else:
-                            logger.info(f"No usable OFF data found for {item_name}, using LLM estimates.")
-                    processed_items.append(item) # Add item (potentially updated)
-                
-                food_data['items'] = processed_items # Update items list
-                # --- Recalculate totals using potentially updated items --- 
-                recalculated_food_data = _recalculate_food_totals(food_data)
-                final_parsed_data_to_save = recalculated_food_data
-            else:
-                # Handle case where parsed_data is missing items etc.
-                logger.warning(f"Invalid food data structure from LLM for text: '{obj_in.entry_text[:50]}...'")
-                entry_type = "unknown" # Fallback to unknown
-                final_parsed_data_to_save = food_data # Save what we got
-                
-        else: # weight, steps - handled by base fields
-            value = parsed_result.get("value")
-            unit = parsed_result.get("unit")
-            final_parsed_data_to_save = parsed_result # Save original parser result
+        # Parse the text using LLM service
+        parsed_result = parse_health_entry_text(obj_in.entry_text)
+        logger.debug(f"LLM Parse Result: {parsed_result}")
 
-        # --- Create DB Object --- 
-        db_obj = HealthEntry(
-            entry_text=obj_in.entry_text, # Get text from input schema
-            owner_id=owner_id,
-            entry_type=entry_type,
-            value=value,
-            unit=unit,
-            parsed_data=final_parsed_data_to_save # Store potentially complex structure or fallback
+        # Determine timestamp
+        entry_timestamp: datetime
+        if obj_in.target_date_str:
+            try:
+                target_dt = date.fromisoformat(obj_in.target_date_str)
+                # Use midday UTC on the target date
+                entry_timestamp = datetime.combine(target_dt, time(12, 0, 0), tzinfo=timezone.utc)
+                logger.info(f"Using target date {target_dt}, generated timestamp: {entry_timestamp}")
+            except ValueError:
+                logger.warning(f"Invalid target_date_str '{obj_in.target_date_str}', falling back to current time.")
+                entry_timestamp = datetime.now(timezone.utc)
+        else:
+            entry_timestamp = datetime.now(timezone.utc)
+            logger.info(f"No target date provided, using current UTC time: {entry_timestamp}")
+            
+        # Prepare DB object data, excluding target_date_str
+        obj_in_data = jsonable_encoder(obj_in)
+        obj_in_data.pop('target_date_str', None) # Remove the field not present in the DB model
+        
+        db_obj = self.model(
+            **obj_in_data, # Now contains only fields like entry_text
+            owner_id=owner_id, 
+            timestamp=entry_timestamp, # Pass calculated timestamp explicitly
+            entry_type=parsed_result.get('type'),
+            value=parsed_result.get('value'),
+            unit=parsed_result.get('unit'),
+            parsed_data=parsed_result.get('parsed_data') or parsed_result
         )
+        
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
-        logger.info(f"Health entry created with id {db_obj.id}, type '{db_obj.entry_type}'")
+        logger.info(f"Successfully created entry ID {db_obj.id} for user {owner_id}")
         return db_obj
 
     def get_multi_by_owner(

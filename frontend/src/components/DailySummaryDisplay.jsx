@@ -1,8 +1,9 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback, useRef } from 'react';
 import apiService from '../services/api';
-import useAuth from '../hooks/useAuth';
+import {useAuth} from '../contexts/AuthContext';
 import { formatValue } from '../utils/formatters'; // formatLocalDate might not be needed here anymore
 import dayjs from 'dayjs'; // Import dayjs
+import LoadingSpinner from './LoadingSpinner'; // Import the spinner
 
 const DailySummaryDisplay = forwardRef((props, ref) => {
     const [summary, setSummary] = useState(null);
@@ -66,8 +67,9 @@ const DailySummaryDisplay = forwardRef((props, ref) => {
 
     // Render logic
     const renderContent = () => {
+        // Show spinner centrally while loading
         if (loading) {
-            return <p>Loading summary for {selectedDate}...</p>;
+            return <LoadingSpinner />;
         }
         if (error) {
             return <p className="error-message">Error: {error}</p>;
@@ -98,11 +100,11 @@ const DailySummaryDisplay = forwardRef((props, ref) => {
         <div className="daily-summary-card">
             {/* Updated Header Layout */}
             <div className="daily-summary-header">
-                <button onClick={goToPreviousDay} className="date-nav-button" aria-label="Previous day">{'<'}</button>
-                <h4 onClick={openDatePicker} style={{ cursor: 'pointer', margin: '0 0.5rem' }} title="Click to select date">
+                <button onClick={goToPreviousDay} className="date-nav-button" aria-label="Previous day" disabled={loading}>{'<'}</button>
+                <h4 onClick={loading ? undefined : openDatePicker} style={{ cursor: loading ? 'default' : 'pointer', margin: '0 0.5rem' }} title="Click to select date">
                     Summary for: {selectedDate}
                 </h4>
-                <button onClick={goToNextDay} className="date-nav-button" aria-label="Next day">{'>'}</button>
+                <button onClick={goToNextDay} className="date-nav-button" aria-label="Next day" disabled={loading}>{'>'}</button>
                 {/* Hidden Date Input controlled by ref */}
                 <input 
                     ref={dateInputRef} 
@@ -110,7 +112,7 @@ const DailySummaryDisplay = forwardRef((props, ref) => {
                     value={selectedDate}
                     onChange={handleDateChange}
                     aria-label="Select summary date"
-                    // Style to hide it visually but keep it functional
+                    disabled={loading} // Disable input while loading
                     style={{ 
                         position: 'absolute', 
                         left: '-9999px', 

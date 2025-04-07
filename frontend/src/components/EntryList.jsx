@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../services/api';
-import useAuth from '../hooks/useAuth';
+import {useAuth} from '../contexts/AuthContext';
 import { formatValue, formatLocalDateTime } from '../utils/formatters'; // Keep this formatter import
 
 // Helper function to display parsed data (adapt as needed based on actual backend response)

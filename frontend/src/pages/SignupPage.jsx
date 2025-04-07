@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { signupUser } from '../services/api';
+import apiService from '../services/api';
 
 function SignupPage() {
   const [email, setEmail] = useState('');
@@ -22,7 +22,7 @@ function SignupPage() {
 
     try {
       console.log('Attempting signup with:', email);
-      const data = await signupUser(email, password);
+      const data = await apiService.signup(email, password);
       console.log('Signup successful:', data);
       setSuccess('Signup successful! You can now log in.');
       // Optionally navigate to login after a short delay

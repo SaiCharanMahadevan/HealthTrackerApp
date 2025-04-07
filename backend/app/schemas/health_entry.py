@@ -6,17 +6,20 @@ from typing import Any, Dict, Optional, List # Import Optional, List
 # Shared properties
 class HealthEntryBase(BaseModel):
     entry_text: str
+    target_date_str: Optional[str] = None # Add optional target date
     # Parsed fields are not in base, they are derived
 
 
 # Properties to receive via API on creation
 class HealthEntryCreate(HealthEntryBase):
-    pass # Only needs entry_text from user
+    pass # Only needs entry_text and target_date_str from user
 
 
 # Properties to receive on item update
 class HealthEntryUpdate(BaseModel): # Not inheriting Base, only receive text
-    entry_text: str
+    entry_text: Optional[str] = None
+    # Do not allow changing timestamp/type/value directly via generic update
+    # Specific update logic might be needed for parsed data, etc.
 
 
 # Properties shared by models stored in DB
@@ -28,10 +31,10 @@ class HealthEntryInDBBase(HealthEntryBase):
     entry_type: Optional[str] = None 
     value: Optional[float] = None
     unit: Optional[str] = None
-    parsed_data: Optional[dict] = None # Store parsed JSON details
+    parsed_data: Optional[Dict[str, Any]] = None # Store parsed JSON details
 
     class Config:
-        from_attributes = True # Replaces orm_mode
+        orm_mode = True # Changed from from_attributes=True for compatibility
         # from_attributes = True # Pydantic V2
 
 

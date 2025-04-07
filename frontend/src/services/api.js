@@ -179,6 +179,19 @@ const apiService = {
         // It might throw an error for non-2xx responses which we catch in the component
         return handleResponse(response); 
     },
+
+    addEntry: async (entryData, token) => {
+
+        const response = await fetch(`${API_BASE_URL}/entries/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(entryData),
+        });
+        return handleResponse(response); // Assume handleResponse exists and throws error on failure
+    },
 };
 
 export default apiService; 

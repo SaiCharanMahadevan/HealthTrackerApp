@@ -1,43 +1,61 @@
 import React from 'react';
 import {
-    BrowserRouter as Router, // Corrected: Was double-imported in main.jsx initially
     Routes,
     Route,
     Navigate
 } from 'react-router-dom';
-import HomePage from './pages/HomePage';
-import AuthPage from './pages/AuthPage';
-import useAuth from './hooks/useAuth';
-import './App.css'; // Ensure App.css is imported
-// import './App.css'; // Assuming you have App.css for styling
+import Navbar from './components/Navbar';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import DiaryPage from './pages/DiaryPage'; 
+import ReportsPage from './pages/ReportsPage';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import LoadingSpinner from './components/LoadingSpinner';
+import './App.css';
 
-function App() {
-    const { token, loading } = useAuth();
+// PrivateRoute component to protect routes
+function PrivateRoute({ children }) {
+    const { isAuthenticated, loading } = useAuth();
 
     if (loading) {
-        // Optional: Show a loading spinner or message while checking auth state
-        return <div>Loading...</div>;
+        return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><LoadingSpinner /></div>;
     }
 
+    return isAuthenticated ? children : <Navigate to="/login" replace />;
+}
+
+function App() {
     return (
-        // Router might be here or in main.jsx, ensure it's only in one place
-        // If Router is in main.jsx, remove it from here.
-        // <Router> 
-            <div className="App">
+        <AuthProvider>
+            <Navbar />
+            <div className="main-content">
                 <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/signup" element={<SignupPage />} />
+                    
+                    {/* Protected Routes */}
                     <Route 
                         path="/" 
-                        element={token ? <HomePage /> : <Navigate to="/auth" replace />}
+                        element={
+                            <PrivateRoute>
+                                <DiaryPage />
+                            </PrivateRoute>
+                        }
                     />
                     <Route 
-                        path="/auth" 
-                        element={!token ? <AuthPage /> : <Navigate to="/" replace />}
+                        path="/reports" 
+                        element={
+                            <PrivateRoute>
+                                <ReportsPage />
+                            </PrivateRoute>
+                        }
                     />
-                    {/* Add other routes here */}
-                    <Route path="*" element={<Navigate to="/" replace />} /> {/* Catch-all redirects to home */}
+                    
+                    {/* Fallback or redirect for any other path */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </div>
-        // </Router>
+        </AuthProvider>
     );
 }
 

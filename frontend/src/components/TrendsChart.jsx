@@ -1,7 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import apiService from '../services/api';
-import useAuth from '../hooks/useAuth';
+import {useAuth} from '../contexts/AuthContext';
 import { formatValue, formatLocalDateTime, formatLocalDate } from '../utils/formatters';
 
 // Format date for XAxis labels

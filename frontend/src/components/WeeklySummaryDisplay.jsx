@@ -1,6 +1,6 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import apiService from '../services/api';
-import useAuth from '../hooks/useAuth';
+import {useAuth} from '../contexts/AuthContext';
 
 const formatValue = (value, decimals = 1) => {
     if (value === null || value === undefined) return 'N/A';
