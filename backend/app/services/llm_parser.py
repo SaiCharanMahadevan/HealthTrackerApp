@@ -1,26 +1,23 @@
 import google.generativeai as genai
 import os
-from dotenv import load_dotenv
+from typing import Optional, Dict, Any
 import json
 import logging # Import logging
 from app.core.config import settings
-from typing import Optional, Dict, Any
 import io
 from PIL import Image # Need Pillow installed (pip install Pillow)
 
 logger = logging.getLogger(__name__) # Get logger
 
-load_dotenv()
-
 # Configure the Gemini API client
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+genai.configure(api_key=settings.GOOGLE_API_KEY)
 
 # Define the generation config and safety settings (adjust as needed)
 generation_config = {
-    "temperature": 0.3,
+"temperature": 0.3,
     "top_p": 1,
     "top_k": 1,
-    "max_output_tokens": 2048,
+"max_output_tokens": 2048,
 }
 
 safety_settings = [
@@ -32,7 +29,7 @@ safety_settings = [
 
 # Choose the model
 model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest",
-                              generation_config=generation_config,
+        generation_config=generation_config,
                               safety_settings=safety_settings)
 
 def _validate_parsed_data(parsed_json: Dict[str, Any]) -> bool:
@@ -73,91 +70,132 @@ def _validate_parsed_data(parsed_json: Dict[str, Any]) -> bool:
         
     return True
 
-def parse_health_entry_text(
-    text: Optional[str] = None, 
-    image_data: Optional[bytes] = None
-) -> Dict[str, Any]:
-    """Parses health entry text and/or image using Gemini multimodal capabilities."""
+def _parse_llm_response_to_dict(response_text: str) -> Dict[str, Any]:
+    """Helper to attempt parsing LLM JSON response."""
+    try:
+        # Attempt to find JSON block
+        json_start = response_text.find('```json')
+        json_end = response_text.rfind('```')
+        if json_start != -1 and json_end != -1:
+            json_str = response_text[json_start + 7:json_end].strip()
+            parsed = json.loads(json_str)
+            if isinstance(parsed, dict):
+                return parsed
+        
+        # Fallback if no JSON block or parsing failed
+        logger.warning(f"Could not parse LLM response as JSON, returning raw text: {response_text[:100]}...")
+        return {"type": "unknown", "raw_response": response_text}
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error parsing LLM response: {e}", exc_info=True)
+        return {"type": "error", "error_detail": "Failed to decode LLM JSON response", "raw_response": response_text}
+    except Exception as e:
+        logger.error(f"Unexpected error parsing LLM response: {e}", exc_info=True)
+        return {"type": "error", "error_detail": "Unexpected error parsing LLM response", "raw_response": response_text}
+
+def parse_health_entry_text(text: Optional[str], image_data: Optional[bytes] = None) -> Dict[str, Any]:
+    """Parses health entry text and/or image using the appropriate Gemini model."""
     
+    logger.info(f"Parsing health entry. Text provided: {bool(text)}. Image data provided: {bool(image_data)}")
+
     if not text and not image_data:
-        logger.error("LLM Parser: Both text and image data are missing.")
-        return {"type": "error", "error_detail": "No input text or image provided."}
+        logger.warning("parse_health_entry_text called with no text and no image data.")
+        return {"type": "error", "error_detail": "No text or image provided for parsing"}
 
-    log_text = text[:100] if text else "[No Text]"
-    log_image = "[Image Provided]" if image_data else "[No Image]"
-    logger.info(f"Attempting LLM parse for: Text='{log_text}...', Image={log_image}")
-
-    # --- Construct Prompt --- 
-    prompt_parts = []
-
-    # Add image data first if present
-    if image_data:
-        try:
-            img = Image.open(io.BytesIO(image_data))
-            prompt_parts.append(img) # Add PIL image object to prompt
-            logger.debug("Added image data to prompt parts.")
-        except Exception as img_err:
-            logger.error(f"Failed to process image data: {img_err}", exc_info=True)
-            return {"type": "error", "error_detail": "Invalid image data provided."}
-
-    # Add text instructions
-    if text:
-        prompt_parts.append(f"Input Text: \"{text}\" (Consider this text alongside the image if provided). ")
-    else:
-        prompt_parts.append("Input Text: [NONE] - Analyze the image only.")
-
-    prompt_parts.extend([
-      "Task: Analyze the input text and/or image, which is a health log entry. Identify the primary entry type ('food', 'weight', 'steps', or 'unknown'). Extract relevant structured data into a JSON object.",
-      "Instructions:",
-      "1. Prioritize image analysis if provided for 'food' type. If the text clearly indicates 'steps' or 'weight', ignore the image for nutritional analysis.",
-      "2. Determine the type ('food', 'weight', 'steps', 'unknown').",
-      "3. If 'food': Identify food items visible in the image or mentioned in text. Estimate quantity, units, and nutritional values (calories, protein_g, carbs_g, fat_g) for each identified item. Calculate totals.",
-      "4. If 'weight' (based on text only): Extract value and unit.",
-      "5. If 'steps' (based on text only): Extract the step count.",
-      "6. If 'unknown' or cannot parse reliably: Set type to 'unknown'.",
-      "Accuracy Emphasis: Prioritize accurate numerical estimations, especially for calories and macronutrients based on common knowledge.",
-      "Output Format: Respond ONLY with the JSON object. Do not include explanations or markdown.",
-      "JSON Structures:",
-      "  Food: {\"type\": \"food\", \"parsed_data\": {\"items\": [{\"quantity\": <num>, \"unit\": \"<str>\", \"item\": \"<str>\", \"calories\": <num>, \"protein_g\": <num>, \"carbs_g\": <num>, \"fat_g\": <num>}], \"total_calories\": <num>, \"total_protein_g\": <num>, \"total_carbs_g\": <num>, \"total_fat_g\": <num>}} (Ensure all total fields are included)",
-      "  Weight: {\"type\": \"weight\", \"value\": <num>, \"unit\": \"<str>\"} (Ensure value and unit)",
-      "  Steps: {\"type\": \"steps\", \"value\": <num>} (Ensure value)",
-      "  Unknown: {\"type\": \"unknown\"}",
-    ])
+    # Define the base prompt structure (adjust as needed)
+    # TODO: Refine this prompt based on desired output format and instructions
+    prompt_instruction = """
+    Analyze the following health log entry (text and/or image).
+    Identify the type of entry (e.g., 'food', 'weight', 'steps', 'exercise', 'medication', 'symptom', 'note').
+    Extract key information relevant to the type.
+    For 'food', list items with quantity, unit, estimated calories, protein, carbs, fat. Calculate totals.
+    For 'weight', extract value and unit (prefer kg).
+    For 'steps', extract value.
+    For others, provide a brief summary.
+    Return the result ONLY as a JSON object within ```json ... ``` tags.
+    Example Food Output:
+    ```json
+    {
+      "type": "food",
+      "parsed_data": {
+        "items": [
+          {"item": "Apple", "quantity": 1, "unit": "piece", "calories": 95, "protein_g": 0.5, "carbs_g": 25, "fat_g": 0.3},
+          {"item": "Banana", "quantity": 1, "unit": "piece", "calories": 105, "protein_g": 1.3, "carbs_g": 27, "fat_g": 0.4}
+        ],
+        "total_calories": 200,
+        "total_protein_g": 1.8,
+        "total_carbs_g": 52,
+        "total_fat_g": 0.7
+      }
+    }
+    ```
+    Example Weight Output:
+    ```json
+    {
+      "type": "weight",
+      "value": 75.5,
+      "unit": "kg",
+      "parsed_data": { "original_text": "Weight 75.5 kg" }
+    }
+    ```
+    If the input cannot be reliably parsed, return:
+    ```json
+    { "type": "unknown", "parsed_data": { "original_text": "..." } }
+    ```
+    """
 
     try:
-        # Generate content using the potentially multimodal prompt
-        response = model.generate_content(prompt_parts)
-        
-        # ... (Rest of response handling, JSON parsing, validation logic remains mostly the same) ...
-        if not response.parts:
-             logger.warning(f"LLM response blocked or empty for text: '{log_text}...'")
-             return {"type": "error", "error_detail": "LLM response blocked or empty"}
+        # --- Conditional Model Selection --- 
+        if image_data:
+            logger.debug("Image data provided, attempting multi-modal parsing.")
+            try:
+                # Attempt to open image to validate and get format
+                img = Image.open(io.BytesIO(image_data))
+                # Gemini supports PNG, JPEG, WEBP, HEIC, HEIF
+                mime_type = Image.MIME.get(img.format)
+                if not mime_type or not mime_type.startswith('image/'):
+                    raise ValueError(f"Unsupported image format: {img.format}")
+                logger.debug(f"Detected image format: {img.format} ({mime_type})")
 
-        raw_output = response.text.strip()
-        # ... (JSON cleaning logic) ...
-        if raw_output.startswith("```json"):
-            raw_output = raw_output[7:]
-        if raw_output.endswith("```"):
-            raw_output = raw_output[:-3]
-        raw_output = raw_output.strip()
+                model = genai.GenerativeModel('gemini-1.5-flash') # Use a vision-capable model
+                prompt_parts = [prompt_instruction]
+                if text:
+                    prompt_parts.append(text)
+                prompt_parts.append({"mime_type": mime_type, "data": image_data})
+                
+                response = model.generate_content(prompt_parts)
+                logger.info("Multi-modal LLM call successful.")
+                return _parse_llm_response_to_dict(response.text)
+
+            except Exception as img_e:
+                logger.error(f"Multi-modal LLM attempt failed (image error or API call): {img_e}", exc_info=True)
+                # Fallback to text-only if image processing fails and text exists?
+                if text:
+                    logger.warning("Falling back to text-only parsing due to image processing/API error.")
+                    # Continue to text-only block below
+                else:
+                    # If only image was provided and it failed, return error
+                    return {"type": "error", "error_detail": f"Image processing failed: {img_e}"} 
         
-        logger.info(f"LLM raw output received: {raw_output}")
-        
-        parsed_json = json.loads(raw_output)
-        
-        if not _validate_parsed_data(parsed_json):
-            logger.warning(f"Parsed JSON failed validation for text: '{log_text}...'. Result: {parsed_json}")
-            return {"type": "unknown", "error_detail": "Parsed JSON failed validation", "original_llm_output": parsed_json}
-        
-        logger.info(f"LLM parse successful and validated for text: '{log_text}...'")
-        return parsed_json
-        
-    except json.JSONDecodeError as e:
-        logger.error(f"LLM JSON parsing failed for text: '{log_text}...'. Raw output: {raw_output}. Error: {e}", exc_info=False)
-        return {"type": "error", "error_detail": "LLM output was not valid JSON"}
+        # --- Text-Only Processing --- 
+        # This block executes if image_data is None OR if image processing failed and we fell back
+        if text:
+            logger.debug("Using text-only parsing.")
+            # Use a text-only model (potentially cheaper/faster if image wasn't relevant)
+            model = genai.GenerativeModel('gemini-1.5-flash') # Can use flash or pro
+            prompt_parts = [prompt_instruction, text]
+            response = model.generate_content(prompt_parts)
+            logger.info("Text-only LLM call successful.")
+            return _parse_llm_response_to_dict(response.text)
+        else:
+            # This case should theoretically not be reached if the initial check passed,
+            # but included for robustness.
+            logger.error("parse_health_entry_text reached text-only block without text.")
+            return {"type": "error", "error_detail": "Parsing attempted without text after image failure."}
+
     except Exception as e:
-        logger.error(f"LLM generation failed for text: '{log_text}...'. Error: {e}", exc_info=True)
-        return {"type": "error", "error_detail": f"LLM generation failed: {e}"}
+        # Catch potential errors during model instantiation or general API issues
+        logger.error(f"LLM parsing failed: {e}", exc_info=True)
+        return {"type": "error", "error_detail": str(e), "raw_response": None}
 
 # Example usage (for testing):
 # if __name__ == "__main__":

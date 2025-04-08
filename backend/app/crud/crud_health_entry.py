@@ -80,8 +80,8 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
         if obj_in.target_date_str:
             try:
                 target_dt = date.fromisoformat(obj_in.target_date_str)
-                # Use midday UTC on the target date
-                entry_timestamp = datetime.combine(target_dt, time(12, 0, 0), tzinfo=timezone.utc)
+                # Use start of day (00:00:00) UTC on the target date
+                entry_timestamp = datetime.combine(target_dt, time.min, tzinfo=timezone.utc)
                 logger.info(f"Using target date {target_dt}, generated timestamp: {entry_timestamp}")
             except ValueError:
                 logger.warning(f"Invalid target_date_str '{obj_in.target_date_str}', falling back to current time.")
@@ -104,7 +104,7 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
             parsed_data=parsed_result.get('parsed_data') or parsed_result,
             # image_url is set later in the API endpoint after saving
         )
-        
+
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)

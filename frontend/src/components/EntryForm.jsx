@@ -49,11 +49,15 @@ const EntryForm = ({ onEntryAdded }) => {
     setLoading(true);
     setError(null);
     try {
-      const payload = { 
-          entry_text: text, 
-          target_date_str: entryDate 
+      // Construct the entry data
+      const entryData = {
+        entry_text: text && text.trim() ? text : undefined,
+        target_date_str: entryDate
       };
-      const newEntry = await apiService.addEntry(payload, token, imageFile);
+      
+      // Call the API service
+      console.log("EntryForm: Calling API service with entryData:", entryData);
+      const newEntry = await apiService.addEntry(entryData, token, imageFile);
       onEntryAdded(newEntry);
       setText('');
       clearImage();

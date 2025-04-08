@@ -181,37 +181,34 @@ const apiService = {
     },
 
     addEntry: async (entryData, token, imageFile = null) => {
-        let body;
+        let body = new FormData();
         const headers = {
             'Authorization': `Bearer ${token}`
-            // Content-Type is set automatically by browser for FormData,
-            // or set to application/json below
+            // Content-Type will be set automatically by browser for FormData
         };
 
+        if (entryData.entry_text) {
+            body.append('entry_text', entryData.entry_text);
+        }
+        if (entryData.target_date_str) {
+            body.append('target_date_str', entryData.target_date_str);
+        }
+        
         if (imageFile) {
             console.log("API Service: Adding entry with image");
-            body = new FormData();
-            if (entryData.entry_text) {
-                body.append('entry_text', entryData.entry_text);
-            }
-            if (entryData.target_date_str) {
-                body.append('target_date_str', entryData.target_date_str);
-            }
             body.append('image', imageFile, imageFile.name);
-            // Don't set Content-Type header for FormData
         } else {
-            console.log("API Service: Adding entry without image:", entryData);
-            headers['Content-Type'] = 'application/json';
-            body = JSON.stringify(entryData);
+            console.log("API Service: Adding text-only entry");
         }
 
+        console.log("API Service: Sending request with FormData body");
         const response = await fetch(`${API_BASE_URL}/entries/`, {
             method: 'POST',
             headers: headers,
-            body: body,
+            body: body
         });
-        // Assuming handleResponse exists and works for JSON and non-JSON success (like 201)
-        return handleResponse(response); 
+
+        return handleResponse(response);
     },
 };
 

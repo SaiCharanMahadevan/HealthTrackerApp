@@ -4,11 +4,10 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
 # Create the SQLAlchemy engine
-# The connect_args are specific to SQLite to allow shared connections across threads
+# Use the correct setting name from config.py
+# Remove connect_args as it's specific to SQLite
 engine = create_engine(
-    settings.DATABASE_URL,
-    # Required for SQLite only
-    connect_args={"check_same_thread": False}
+    str(settings.SQLALCHEMY_DATABASE_URI) # Convert Dsn to string for engine
 )
 
 # Create a session factory
