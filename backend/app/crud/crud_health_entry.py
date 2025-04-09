@@ -60,6 +60,90 @@ def _recalculate_food_totals(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     logger.info(f"Recalculated food totals: Cals={parsed_data['total_calories']}, P={parsed_data['total_protein_g']}")
     return parsed_data
 
+# --- NEW Helper Function for Nutrition Enrichment ---
+def _enrich_item_nutrition(item: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Attempts to enrich a food item dict with nutritional data from OFF 
+    if calories are missing (None). Adds a nutrition_source field.
+    Applies scaling based on specified_amount in grams if possible.
+    VALIDATES product name match before using OFF data.
+    """
+    if not isinstance(item, dict):
+        return item # Return unchanged if not a dict
+
+    item_name = item.get('item')
+    calories = item.get('calories') # Check if calories are already present (even if 0)
+
+    # Default source
+    item['nutrition_source'] = 'LLM Estimate' 
+
+    # Only attempt OFF lookup if item name exists AND calories are explicitly None
+    if item_name and calories is None:
+        logger.debug(f"Item '{item_name}' missing calories, attempting OFF lookup.")
+        off_data = get_nutrition_from_off(item_name)
+        
+        if off_data:
+            off_product_name = off_data.get('product_name', '')
+            logger.debug(f"Found OFF data for '{item_name}'. Product: '{off_product_name}', Source: {off_data.get('source', 'OpenFoodFacts')}")
+            
+            # --- !! Stricter Validation !! ---
+            # Basic check: Ensure at least one significant word from LLM item_name is in OFF product_name (case-insensitive)
+            # This is a simple heuristic, could be improved with fuzzy matching libraries if needed.
+            llm_keywords = set(word.lower() for word in item_name.split() if len(word) > 2) # Get significant words from LLM name
+            off_name_lower = off_product_name.lower()
+            is_match = any(keyword in off_name_lower for keyword in llm_keywords)
+            
+            if not is_match:
+                 logger.warning(f"OFF product name '{off_product_name}' does not seem to match LLM item '{item_name}'. Skipping OFF enrichment.")
+                 item['nutrition_source'] = 'LLM Estimate (OFF Mismatch)' # Indicate mismatch
+                 # Exit the enrichment block for this item
+            else:
+                # --- Proceed with enrichment only if match is good --- 
+                item['nutrition_source'] = off_data.get('source', 'OpenFoodFacts')
+                
+                # Attempt scaling only if specified_amount in grams is provided
+                scaling_factor = None
+                amount = item.get('specified_amount')
+                amount_unit = item.get('specified_unit')
+                if amount is not None and amount_unit and amount_unit.lower() == 'g':
+                    try: 
+                        scaling_factor = float(amount) / 100.0
+                        logger.debug(f"Applying scaling factor {scaling_factor} based on {amount}g")
+                    except (ValueError, TypeError): 
+                        logger.warning(f"Could not parse specified_amount '{amount}' as float for scaling.")
+                        scaling_factor = None # Reset if parsing fails
+                
+                # Update fields ONLY if they were originally None from LLM
+                # And apply scaling factor if applicable
+                try:
+                    if item.get('calories') is None:
+                        val = off_data.get('calories_100g')
+                        if val is not None: item['calories'] = round(val * scaling_factor) if scaling_factor is not None else round(val)
+                    if item.get('protein_g') is None:
+                        val = off_data.get('protein_100g')
+                        if val is not None: item['protein_g'] = round(val * scaling_factor, 1) if scaling_factor is not None else round(val, 1)
+                    if item.get('carbs_g') is None:
+                        val = off_data.get('carbs_100g')
+                        if val is not None: item['carbs_g'] = round(val * scaling_factor, 1) if scaling_factor is not None else round(val, 1)
+                    if item.get('fat_g') is None:
+                        val = off_data.get('fat_100g')
+                        if val is not None: item['fat_g'] = round(val * scaling_factor, 1) if scaling_factor is not None else round(val, 1)
+                    # Update unit if missing and scaling wasn't based on grams
+                    if item.get('unit') is None and scaling_factor is None:
+                         item['unit'] = off_data.get('unit', 'portion')
+                         
+                except (ValueError, TypeError, KeyError) as e:
+                    logger.warning(f"Error applying OFF data for '{item_name}' (scaling factor: {scaling_factor}): {e}")
+            # --- End enrichment block ---
+        else:
+            logger.debug(f"No OFF data found for '{item_name}'.")
+            item['nutrition_source'] = 'LLM Estimate (Not Found in OFF)' # More specific source
+            
+    elif item_name and calories is not None:
+         item['nutrition_source'] = 'LLM Estimate (Provided)' # Indicate LLM gave a value
+
+    return item
+
 class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate]):
     def create_with_owner(
         self,
@@ -71,16 +155,13 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
     ) -> HealthEntry:
         logger.info(f"Attempting to create entry for user {owner_id}, text: '{obj_in.entry_text[:50] if obj_in.entry_text else '[No Text]' }...', target_date: {obj_in.target_date_str}, image: {bool(image_data)}")
         
-        # Parse the text and/or image using LLM service
         parsed_result = parse_health_entry_text(text=obj_in.entry_text, image_data=image_data)
         logger.debug(f"LLM Parse Result: {parsed_result}")
 
-        # Determine timestamp
         entry_timestamp: datetime
         if obj_in.target_date_str:
             try:
                 target_dt = date.fromisoformat(obj_in.target_date_str)
-                # Use start of day (00:00:00) UTC on the target date
                 entry_timestamp = datetime.combine(target_dt, time.min, tzinfo=timezone.utc)
                 logger.info(f"Using target date {target_dt}, generated timestamp: {entry_timestamp}")
             except ValueError:
@@ -90,19 +171,34 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
             entry_timestamp = datetime.now(timezone.utc)
             logger.info(f"No target date provided, using current UTC time: {entry_timestamp}")
             
-        # Prepare DB object data, excluding target_date_str
+        entry_type = parsed_result.get('type', 'unknown')
+        value = parsed_result.get('value')
+        unit = parsed_result.get('unit')
+        parsed_data_to_save = parsed_result.get('parsed_data') or parsed_result # Use inner dict if exists
+
+        # --- Enrich and Recalculate if Food ---
+        if entry_type == 'food' and isinstance(parsed_data_to_save, dict) and 'items' in parsed_data_to_save:
+            logger.debug(f"Enriching food items for new entry...")
+            enriched_items = []
+            for item in parsed_data_to_save.get('items', []):
+                enriched_items.append(_enrich_item_nutrition(item)) # Call helper
+            parsed_data_to_save['items'] = enriched_items
+            
+            logger.debug(f"Recalculating totals for new entry...")
+            parsed_data_to_save = _recalculate_food_totals(parsed_data_to_save) # Recalc after enrichment
+        # --------------------------------------
+            
         obj_in_data = jsonable_encoder(obj_in)
-        obj_in_data.pop('target_date_str', None) # Remove the field not present in the DB model
+        obj_in_data.pop('target_date_str', None) 
         
         db_obj = self.model(
-            **obj_in_data, # Now contains only fields like entry_text
+            **obj_in_data, 
             owner_id=owner_id, 
-            timestamp=entry_timestamp, # Pass calculated timestamp explicitly
-            entry_type=parsed_result.get('type'),
-            value=parsed_result.get('value'),
-            unit=parsed_result.get('unit'),
-            parsed_data=parsed_result.get('parsed_data') or parsed_result,
-            # image_url is set later in the API endpoint after saving
+            timestamp=entry_timestamp,
+            entry_type=entry_type, # Use determined type
+            value=value,         # Use determined value
+            unit=unit,           # Use determined unit
+            parsed_data=parsed_data_to_save, # Use final processed data
         )
 
         db.add(db_obj)
@@ -143,16 +239,14 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
              logger.warning(f"Update called for Entry ID {db_obj.id} without new text. No update performed.")
              return db_obj # Return original object if no text provided
 
-        # --- Re-parse the updated text --- 
         logger.info(f"Updating Entry ID: {db_obj.id}. Parsing new text: '{new_text[:50]}...'") 
         parsed_result = parse_health_entry_text(new_text)
         logger.info(f"Parser result for Entry ID {db_obj.id}: {parsed_result}")
 
-        # --- Handle Parser Result --- 
         entry_type = parsed_result.get("type", "unknown")
         value = None
         unit = None
-        final_parsed_data_to_save = parsed_result # Start with original
+        final_parsed_data_to_save = parsed_result 
 
         if entry_type == "error" or entry_type == "unknown":
             logger.error(f"LLM parser returned error during update for Entry ID {db_obj.id}, text: '{new_text[:50]}...' - Detail: {parsed_result.get('error_detail')}")
@@ -162,32 +256,19 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
         elif entry_type == 'food':
             food_data = parsed_result.get('parsed_data')
             if isinstance(food_data, dict) and 'items' in food_data and isinstance(food_data['items'], list):
-                processed_items = []
+                # --- Enrich items using helper ---
+                logger.debug(f"Enriching food items for update entry {db_obj.id}...")
+                enriched_items = []
                 for item in food_data['items']:
-                    if not isinstance(item, dict): continue
-                    item_name = item.get('item')
-                    item['nutrition_source'] = 'LLM Estimate' 
-                    if item_name:
-                        off_data = get_nutrition_from_off(item_name)
-                        if off_data:
-                            item['nutrition_source'] = off_data['source']
-                            scaling_factor = None
-                            amount = item.get('specified_amount')
-                            amount_unit = item.get('specified_unit')
-                            if amount is not None and amount_unit and amount_unit.lower() == 'g':
-                                try: scaling_factor = float(amount) / 100.0
-                                except: pass
-                            if scaling_factor is not None:
-                                try:
-                                    item['calories'] = round(off_data['calories_100g'] * scaling_factor)
-                                    item['protein_g'] = round(off_data['protein_100g'] * scaling_factor, 1)
-                                    item['carbs_g'] = round(off_data['carbs_100g'] * scaling_factor, 1)
-                                    item['fat_g'] = round(off_data['fat_100g'] * scaling_factor, 1)
-                                except Exception as e: pass
-                        processed_items.append(item)
-                food_data['items'] = processed_items
+                     enriched_items.append(_enrich_item_nutrition(item)) # Call helper
+                food_data['items'] = enriched_items
+                # ---------------------------------
+
+                # --- Recalculate totals (existing logic) ---
+                logger.debug(f"Recalculating totals for update entry {db_obj.id}...")
                 recalculated_food_data = _recalculate_food_totals(food_data)
                 final_parsed_data_to_save = recalculated_food_data
+                # -------------------------------------------
             else:
                 logger.warning(f"Invalid food data structure during update for Entry ID {db_obj.id}")
                 entry_type = "unknown"
@@ -344,44 +425,45 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
     def get_trends(
         self, db: Session, *, user_id: int, start_date: date, end_date: date, tz_offset_minutes: int = 0
     ) -> TrendReport:
-        logger.info(f"CRUD: Trends report user {user_id}, {start_date} to {end_date}, offset {tz_offset_minutes}")
+        logger.info(f"CRUD: Trends report user {user_id}, LOCAL dates {start_date} to {end_date}, offset {tz_offset_minutes}") # Log local dates
         
-        # Get UTC boundaries for the start and end local dates
         utc_start, _ = self._get_utc_bounds_for_local_date(start_date, tz_offset_minutes)
         _, utc_end = self._get_utc_bounds_for_local_date(end_date, tz_offset_minutes)
         
         logger.debug(f"Querying trends between UTC {utc_start} and {utc_end}")
 
-        # Weight Trends (Query within adjusted UTC range)
+        # Weight Trends
         weight_data = db.query(HealthEntry.timestamp, HealthEntry.value).filter(
             HealthEntry.owner_id == user_id,
             HealthEntry.timestamp >= utc_start,
             HealthEntry.timestamp < utc_end,
-            HealthEntry.entry_type == 'weight',
+            HealthEntry.entry_type == 'weight', # Verify exact string 'weight'
             HealthEntry.unit.ilike('kg%')
         ).order_by(HealthEntry.timestamp.asc()).all()
+        logger.debug(f"Found {len(weight_data)} raw weight entries.") # Log count
         weight_trends = [TrendDataPoint(timestamp=ts, value=val) for ts, val in weight_data if val is not None]
 
-        # Steps Trends (Daily totals - Grouping needs care with timezone)
-        # Option 1: Group by UTC date - might split local days
-        # Option 2: Fetch all step entries and group in Python by local date (Safer)
-        
+        # Steps Trends
         step_entries = db.query(HealthEntry.timestamp, HealthEntry.value).filter(
             HealthEntry.owner_id == user_id,
             HealthEntry.timestamp >= utc_start,
             HealthEntry.timestamp < utc_end,
-            HealthEntry.entry_type == 'steps'
+            HealthEntry.entry_type == 'steps' # Verify exact string 'steps'
         ).order_by(HealthEntry.timestamp.asc()).all()
+        logger.debug(f"Found {len(step_entries)} raw step entries.") # Log count
 
-        # Group steps by local date in Python
+        # Group steps by local date
         daily_steps = {}
         offset_delta = timedelta(minutes=-tz_offset_minutes)
         for ts_utc, val in step_entries:
             if val is None: continue
             local_date = (ts_utc + offset_delta).date()
-            daily_steps[local_date] = daily_steps.get(local_date, 0) + float(val)
+            try:
+                daily_steps[local_date] = daily_steps.get(local_date, 0) + float(val)
+            except (ValueError, TypeError):
+                logger.warning(f"Could not convert step value '{val}' to float for date {local_date}")
+        logger.debug(f"Grouped daily steps (local dates): {daily_steps}") # Log grouped data
             
-        # Convert grouped data to TrendDataPoints (using start of local day as timestamp)
         steps_trends = [
             TrendDataPoint(timestamp=datetime.combine(day, time.min), value=total) 
             for day, total in sorted(daily_steps.items())
@@ -393,7 +475,7 @@ class CRUDHealthEntry(CRUDBase[HealthEntry, HealthEntryCreate, HealthEntryUpdate
             weight_trends=weight_trends,
             steps_trends=steps_trends
         )
-        logger.info(f"Trends report generated for user {user_id}")
+        logger.info(f"Trends report generated for user {user_id}. Weight points: {len(weight_trends)}, Steps points: {len(steps_trends)}") # Log final counts
         return report
 
     def get_daily_summary(

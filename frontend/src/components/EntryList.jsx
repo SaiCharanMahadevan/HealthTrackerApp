@@ -52,19 +52,19 @@ const EntryList = forwardRef(({ entries, setEntries, onEntryUpdated, onEntryDele
 
     // Expose refetch method
     const fetchEntries = useCallback(async () => {
-        if (!token) return;
-        setListLoading(true);
-        setListError(null);
-        try {
-            const fetchedEntries = await apiService.getEntries(token);
-            fetchedEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            setEntries(fetchedEntries);
-        } catch (err) {
-            setListError(err.message || 'Failed to fetch entries.');
-            console.error(err);
-        } finally {
-            setListLoading(false);
-        }
+            if (!token) return;
+            setListLoading(true);
+            setListError(null);
+            try {
+                const fetchedEntries = await apiService.getEntries(token);
+                fetchedEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                setEntries(fetchedEntries);
+            } catch (err) {
+                setListError(err.message || 'Failed to fetch entries.');
+                console.error(err);
+            } finally {
+                setListLoading(false);
+            }
     }, [token, setEntries]);
 
     useEffect(() => {
@@ -97,26 +97,26 @@ const EntryList = forwardRef(({ entries, setEntries, onEntryUpdated, onEntryDele
                 <ul> 
                     {entries.map((entry) => (
                         <li key={entry.id}>
-                            <strong>{formatLocalDateTime(entry.timestamp)}:</strong>
+                            <strong>{formatLocalDateTime(entry.timestamp)}:</strong> 
                             <div className="entry-content">
                                 {displayParsedData(entry)}
-                            </div>
-                            <div className="entry-actions">
+                                </div>
+                                    <div className="entry-actions">
                                 <button 
                                     onClick={() => onEditClick(entry)} 
                                     className="button-edit"
                                     aria-label={`Edit entry from ${formatLocalDateTime(entry.timestamp)}`}
                                 >
-                                    Edit
-                                </button>
+                                            Edit
+                                        </button>
                                 <button 
                                     onClick={() => handleDelete(entry.id)} 
                                     className="button-delete"
                                     aria-label={`Delete entry from ${formatLocalDateTime(entry.timestamp)}`}
                                 >
-                                    Delete
-                                </button>
-                            </div>
+                                            Delete
+                                        </button>
+                                    </div>
                         </li>
                     ))}
                 </ul>

@@ -27,11 +27,6 @@ safety_settings = [
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
 ]
 
-# Choose the model
-model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest",
-        generation_config=generation_config,
-                              safety_settings=safety_settings)
-
 def _validate_parsed_data(parsed_json: Dict[str, Any]) -> bool:
     """Basic validation for expected keys based on type."""
     entry_type = parsed_json.get('type')
@@ -102,12 +97,11 @@ def parse_health_entry_text(text: Optional[str], image_data: Optional[bytes] = N
         return {"type": "error", "error_detail": "No text or image provided for parsing"}
 
     # Define the base prompt structure (adjust as needed)
-    # TODO: Refine this prompt based on desired output format and instructions
     prompt_instruction = """
     Analyze the following health log entry (text and/or image).
     Identify the type of entry (e.g., 'food', 'weight', 'steps', 'exercise', 'medication', 'symptom', 'note').
     Extract key information relevant to the type.
-    For 'food', list items with quantity, unit, estimated calories, protein, carbs, fat. Calculate totals.
+    For 'food', list items with quantity, unit, and provide your BEST ESTIMATE for nutritional values (calories, protein_g, carbs_g, fat_g). If nutritional values are completely unknown or cannot be reasonably estimated, use null. Calculate totals based on your estimates.
     For 'weight', extract value and unit (prefer kg).
     For 'steps', extract value.
     For others, provide a brief summary.
@@ -144,7 +138,6 @@ def parse_health_entry_text(text: Optional[str], image_data: Optional[bytes] = N
     """
 
     try:
-        # --- Conditional Model Selection --- 
         if image_data:
             logger.debug("Image data provided, attempting multi-modal parsing.")
             try:
@@ -156,13 +149,20 @@ def parse_health_entry_text(text: Optional[str], image_data: Optional[bytes] = N
                     raise ValueError(f"Unsupported image format: {img.format}")
                 logger.debug(f"Detected image format: {img.format} ({mime_type})")
 
-                model = genai.GenerativeModel('gemini-1.5-flash') # Use a vision-capable model
+                # --- Use gemini-1.5-pro-latest for multi-modal --- 
+                vision_model = genai.GenerativeModel(
+                    'gemini-2.0-flash-exp', 
+                    generation_config=generation_config,
+                    safety_settings=safety_settings
+                )
                 prompt_parts = [prompt_instruction]
                 if text:
                     prompt_parts.append(text)
                 prompt_parts.append({"mime_type": mime_type, "data": image_data})
                 
-                response = model.generate_content(prompt_parts)
+                response = vision_model.generate_content(prompt_parts)
+                # --- End model usage change ---
+                
                 logger.info("Multi-modal LLM call successful.")
                 return _parse_llm_response_to_dict(response.text)
 
@@ -180,10 +180,16 @@ def parse_health_entry_text(text: Optional[str], image_data: Optional[bytes] = N
         # This block executes if image_data is None OR if image processing failed and we fell back
         if text:
             logger.debug("Using text-only parsing.")
-            # Use a text-only model (potentially cheaper/faster if image wasn't relevant)
-            model = genai.GenerativeModel('gemini-1.5-flash') # Can use flash or pro
+            # --- Use gemini-1.5-flash for text-only --- 
+            text_model = genai.GenerativeModel(
+                'gemini-2.0-flash-exp',
+                generation_config=generation_config,
+                safety_settings=safety_settings
+            ) 
             prompt_parts = [prompt_instruction, text]
-            response = model.generate_content(prompt_parts)
+            response = text_model.generate_content(prompt_parts)
+            # --- End model usage change ---
+            
             logger.info("Text-only LLM call successful.")
             return _parse_llm_response_to_dict(response.text)
         else:
