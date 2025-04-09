@@ -29,7 +29,7 @@ app = FastAPI(title="Health Tracker API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS], # Use settings here (convert AnyHttpUrl to str)
+    allow_origins=["*"], # Use settings here (convert AnyHttpUrl to str)
     allow_credentials=True, # Allows cookies/auth headers
     allow_methods=["*"],    # Allows all methods (GET, POST, etc.)
     allow_headers=["*"],    # Allows all headers
