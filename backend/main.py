@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.session import engine
 from app.db.base import Base
+from app.core.config import settings # Import settings
 
 # --- Logging Configuration --- 
 logging.basicConfig(
@@ -19,23 +20,16 @@ logger = logging.getLogger(__name__)
 logger.info("Starting Health Tracker application...")
 
 # Create database tables (This is simple for development, consider Alembic for migrations)
-Base.metadata.create_all(bind=engine) # Uncommented for initial setup
+# Base.metadata.create_all(bind=engine) # Comment out or remove after initial setup/use migrations
 
 app = FastAPI(title="Health Tracker API", version="0.1.0")
 
 # --- CORS Configuration --- 
-# List of allowed origins (e.g., your frontend development server)
-# Use "*" for development to allow all origins, but be more specific in production.
-origins = [
-    "http://localhost:5173", # Default Vite port
-    "http://localhost:3000", # Default create-react-app port
-    "http://localhost",      # Sometimes needed
-    # Add your frontend production URL here when deploying
-]
+# The list of allowed origins is now loaded from settings via environment variables
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, # Allows specific origins
+    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS], # Use settings here (convert AnyHttpUrl to str)
     allow_credentials=True, # Allows cookies/auth headers
     allow_methods=["*"],    # Allows all methods (GET, POST, etc.)
     allow_headers=["*"],    # Allows all headers
