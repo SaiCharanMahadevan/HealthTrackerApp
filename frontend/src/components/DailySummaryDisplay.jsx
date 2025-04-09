@@ -69,7 +69,12 @@ const DailySummaryDisplay = forwardRef((props, ref) => {
     const renderContent = () => {
         // Show spinner centrally while loading
         if (loading) {
-            return <LoadingSpinner />;
+            // Wrap spinner in a centering div
+            return (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100px' /* Add min-height */ }}>
+                    <LoadingSpinner />
+                </div>
+            );
         }
         if (error) {
             return <p className="error-message">Error: {error}</p>;

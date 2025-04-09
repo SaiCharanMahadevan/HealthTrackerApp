@@ -19,6 +19,7 @@ def login_for_access_token(
     """
     OAuth2 compatible token login, get an access token for future requests
     """
+    logger.info(f"Received login request. Form data username: '{form_data.username}', Form data password length: {len(form_data.password) if form_data.password else 0}")
     logger.info(f"Login attempt for user: {form_data.username}")
     user = crud.user.get_by_email(db, email=form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):

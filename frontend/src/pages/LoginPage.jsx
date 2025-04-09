@@ -1,28 +1,31 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {useAuth} from '../contexts/AuthContext';
+import apiService from '../services/api';
 
 function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null); // State for error messages
   const navigate = useNavigate(); // Still needed for potential redirects *from* login page (e.g., signup link)
-  const { login } = useAuth(); // Get the login function from context
+  const { login: contextLogin } = useAuth(); // Get the login function from context
+  const [isSubmitting, setIsSubmitting] = useState(false); // Keep submitting state
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError(null); // Clear previous errors
+    if (isSubmitting) return; // Prevent double submit
+
+    setError(null);
+    setIsSubmitting(true);
+
     try {
       console.log('LoginPage: Calling context login with:', email);
-      // Call the login function from AuthContext
-      await login(email, password); 
-      // Navigation will now be handled within the AuthContext's login function
-      // No need for navigate('/') or reload here
-      console.log('LoginPage: Context login successful');
+      await contextLogin(email, password);
+      console.log('LoginPage: Context login successful (navigation handled by context)');
     } catch (err) {
       console.error('LoginPage: Context login failed:', err);
-      // Use err.message from the context/apiService call
       setError(err.message || 'Login failed. Please check your credentials.');
+      setIsSubmitting(false); // Re-enable button on error
     }
   };
 
@@ -52,7 +55,9 @@ function LoginPage() {
             required
           />
         </div>
-        <button type="submit" className="form-button">Login</button>
+        <button type="submit" className="form-button" disabled={isSubmitting}>
+           {isSubmitting ? 'Logging in...' : 'Login'}
+         </button>
       </form>
       {error && <p className="error-message">{error}</p>}
       <p>

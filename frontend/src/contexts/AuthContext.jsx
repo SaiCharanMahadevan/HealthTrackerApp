@@ -59,9 +59,9 @@ export const AuthProvider = ({ children }) => {
             setToken(newToken); 
             // The useEffect will now fetch the user based on the new token
             
-            // Navigate to home page AFTER successful login and token set
-            console.log("AuthContext: Navigating to / after login");
-            navigate('/');
+            // Navigate to DIARY page AFTER successful login and token set, replacing history
+            console.log("AuthContext: Navigating to /diary after login");
+            navigate('/diary', { replace: true });
             
         } catch (error) {
             console.error("AuthContext: API login failed:", error);

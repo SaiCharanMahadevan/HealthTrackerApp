@@ -587,6 +587,14 @@ nav button:hover {
     flex-basis: auto; /* Let width be auto */
     width: 80%; /* Control width when stacked */
   }
+
+  .daily-summary-item {
+     min-width: initial; /* Reset min-width */
+     text-align: center; /* Center text inside item */
+  }
+  .daily-summary-header {
+     justify-content: space-between; /* Space out on smaller screens */
+  }
 }
 
 /* Specific styles for Daily Summary */
@@ -662,20 +670,6 @@ nav button:hover {
 .daily-summary-item strong {
   font-size: 1.1rem;
   color: #fff;
-}
-
-/* Responsive adjustments (existing) */
-@media (max-width: 768px) {
-  .daily-summary-grid {
-    flex-direction: column;
-    align-items: stretch; /* Stretch items to full width */
-  }
-  .daily-summary-item {
-     min-width: initial; /* Reset min-width */
-  }
-  .daily-summary-header {
-     justify-content: space-between; /* Space out on smaller screens */
-  }
 }
 
 /* === Form Styles (Login/Signup) === */
@@ -927,11 +921,12 @@ nav button:hover {
 }
 
 .image-preview {
+    display: block; /* Treat image as a block */
     max-width: 100%; /* Ensure image fits container */
     max-height: 200px; /* Limit preview height */
     border-radius: 4px;
     border: 1px solid #555;
-    margin-bottom: 0.5rem; /* Space below image */
+    margin: 0 auto 0.5rem auto; 
 }
 
 .button-small { /* Simple small button style */

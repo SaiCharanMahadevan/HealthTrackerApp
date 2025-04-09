@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str = "YOUR_GOOGLE_API_KEY"
 
     # --- CORS --- 
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     class Config:
         case_sensitive = True
