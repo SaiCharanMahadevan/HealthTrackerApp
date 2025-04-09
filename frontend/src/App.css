@@ -307,7 +307,11 @@ nav button:hover {
 }
 
 .entry-content {
-  line-height: 1.6;
+  margin-top: 0.5rem; /* Add some space below the timestamp */
+  /* Add word wrapping */
+  overflow-wrap: break-word;
+  word-break: break-word; /* More aggressive break if needed */
+  hyphens: auto; /* Optional: Improve appearance of wrapped text */
 }
 
 /* Error Message Styling (General) */
