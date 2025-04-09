@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import apiService from '../services/api';
 import {useAuth} from '../contexts/AuthContext';
 import { formatValue, formatLocalDateTime } from '../utils/formatters'; // Keep this formatter import
+import LoadingSpinner from './LoadingSpinner';
 
 // Helper function to display parsed data (adapt as needed based on actual backend response)
 const displayParsedData = (entry) => {
@@ -44,35 +45,35 @@ const displayParsedData = (entry) => {
     }
 };
 
-const EntryList = ({ entries, setEntries, onEntryUpdated, onEntryDeleted }) => {
+const EntryList = forwardRef(({ entries, setEntries, onEntryUpdated, onEntryDeleted, onEditClick }, ref) => {
     const [listLoading, setListLoading] = useState(false); 
     const [listError, setListError] = useState(null); 
     const { token } = useAuth();
 
-    // State for inline editing
-    const [editingEntryId, setEditingEntryId] = useState(null);
-    const [editText, setEditText] = useState('');
-    const [editLoading, setEditLoading] = useState(false);
-    const [editError, setEditError] = useState(null);
+    // Expose refetch method
+    const fetchEntries = useCallback(async () => {
+        if (!token) return;
+        setListLoading(true);
+        setListError(null);
+        try {
+            const fetchedEntries = await apiService.getEntries(token);
+            fetchedEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            setEntries(fetchedEntries);
+        } catch (err) {
+            setListError(err.message || 'Failed to fetch entries.');
+            console.error(err);
+        } finally {
+            setListLoading(false);
+        }
+    }, [token, setEntries]);
 
     useEffect(() => {
-        const fetchEntries = async () => {
-            if (!token) return;
-            setListLoading(true);
-            setListError(null);
-            try {
-                const fetchedEntries = await apiService.getEntries(token);
-                fetchedEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                setEntries(fetchedEntries);
-            } catch (err) {
-                setListError(err.message || 'Failed to fetch entries.');
-                console.error(err);
-            } finally {
-                setListLoading(false);
-            }
-        };
         fetchEntries();
-    }, [token, setEntries]);
+    }, [fetchEntries]);
+    
+    useImperativeHandle(ref, () => ({
+        refetch: fetchEntries
+    }));
 
     const handleDelete = async (entryId) => {
         if (!window.confirm("Are you sure you want to delete this entry?")) {
@@ -87,88 +88,43 @@ const EntryList = ({ entries, setEntries, onEntryUpdated, onEntryDeleted }) => {
         }
     };
 
-    const handleEditClick = (entry) => {
-        setEditingEntryId(entry.id);
-        setEditText(entry.entry_text);
-        setEditError(null); // Clear previous edit errors
-    };
-
-    const handleCancel = () => {
-        setEditingEntryId(null);
-        setEditText('');
-        setEditError(null);
-    };
-
-    const handleSave = async (entryId) => {
-        if (!editText.trim() || !token) {
-            setEditError('Entry text cannot be empty.');
-            return;
-        }
-        setEditLoading(true);
-        setEditError(null);
-        try {
-            const updatedEntry = await apiService.updateEntry(entryId, { entry_text: editText }, token);
-            onEntryUpdated(updatedEntry); // Notify parent to update state
-            handleCancel(); // Close edit form
-        } catch (err) {
-            console.error("Update failed:", err);
-            setEditError(err.message || 'Failed to update entry.');
-        } finally {
-            setEditLoading(false);
-        }
-    };
-
-    if (listLoading) return <p>Loading entries...</p>;
+    if (listLoading) return <LoadingSpinner />;
     if (listError) return <p className="error-message">Error: {listError}</p>;
 
     return (
         <div className="entry-list-card"> 
             {entries.length > 0 ? (
-                // Restore original ul/li structure
                 <ul> 
                     {entries.map((entry) => (
                         <li key={entry.id}>
-                            {/* Apply formatting to the timestamp here */}
-                            <strong>{formatLocalDateTime(entry.timestamp)}:</strong> 
-                            {editingEntryId === entry.id ? (
-                                <div className="edit-form"> {/* Inline Edit Form */} 
-                                    <textarea
-                                        rows="3"
-                                        value={editText}
-                                        onChange={(e) => setEditText(e.target.value)}
-                                        disabled={editLoading}
-                                    />
-                                    {editError && <p className="error-message">{editError}</p>}
-                                    <div className="edit-actions">
-                                        <button onClick={() => handleSave(entry.id)} disabled={editLoading}>
-                                            {editLoading ? 'Saving...' : 'Save'}
-                                        </button>
-                                        <button onClick={handleCancel} disabled={editLoading} className="button-cancel">
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <> {/* Display View */} 
-                                    <div className="entry-content">{displayParsedData(entry)}</div>
-                                    <div className="entry-actions">
-                                        <button onClick={() => handleEditClick(entry)} className="button-edit">
-                                            Edit
-                                        </button>
-                                        <button onClick={() => handleDelete(entry.id)} className="button-delete">
-                                            Delete
-                                        </button>
-                                    </div>
-                                </>
-                            )}
+                            <strong>{formatLocalDateTime(entry.timestamp)}:</strong>
+                            <div className="entry-content">
+                                {displayParsedData(entry)}
+                            </div>
+                            <div className="entry-actions">
+                                <button 
+                                    onClick={() => onEditClick(entry)} 
+                                    className="button-edit"
+                                    aria-label={`Edit entry from ${formatLocalDateTime(entry.timestamp)}`}
+                                >
+                                    Edit
+                                </button>
+                                <button 
+                                    onClick={() => handleDelete(entry.id)} 
+                                    className="button-delete"
+                                    aria-label={`Delete entry from ${formatLocalDateTime(entry.timestamp)}`}
+                                >
+                                    Delete
+                                </button>
+                            </div>
                         </li>
                     ))}
                 </ul>
             ) : (
-                <p>No entries yet. Add one above!</p>
+                <p>No entries logged yet.</p>
             )}
         </div>
     );
-};
+});
 
 export default EntryList; 

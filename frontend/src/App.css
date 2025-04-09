@@ -1,3 +1,6 @@
+/* Import Modal styles */
+@import './Modal.css';
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -161,6 +164,7 @@ nav button:hover {
 .form-group {
   display: flex;
   flex-direction: column;
+  margin-bottom: 1.5rem; /* Increased margin for more spacing */
 }
 
 .form-group label {
@@ -691,7 +695,7 @@ nav button:hover {
 }
 
 .form-group {
-  margin-bottom: 1rem; /* Slightly reduced margin */
+  margin-bottom: 1.5rem; /* Increased margin for more spacing */
 }
 
 .form-group label {
@@ -703,24 +707,33 @@ nav button:hover {
 
 /* Refined Input Styles (Date + Text) */
 .form-input,
-.entry-form-card textarea {
+/* Target textareas within form groups specifically */
+.form-group textarea {
   width: 100%;
-  padding: 0.8rem 1rem; /* Adjusted padding */
-  border: 1px solid #555; /* Subtle border */
-  background-color: #444; /* Input background */
+  padding: 0.8rem 1rem; 
+  border: 1px solid #555; 
+  background-color: #444; 
   color: #eee;
-  border-radius: 6px; /* Slightly more rounded */
+  border-radius: 6px; 
   font-size: 1rem;
   box-sizing: border-box; 
-  line-height: 1.4; /* Improve text readability */
-  transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Smooth transitions */
+  line-height: 1.4; 
+  transition: border-color 0.2s ease, box-shadow 0.2s ease; 
+  /* Explicitly set font-family instead of relying on inherit */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 /* Specific styles for textarea in EntryForm */
 .entry-form-card textarea {
     resize: vertical; /* Allow vertical resize only */
-    min-height: 80px; /* Set a minimum height */
+    min-height: 100px; /* Slightly increased min-height */
     font-family: inherit; /* Ensure consistent font */
+}
+
+/* Style the placeholder text */
+.form-group textarea::placeholder {
+  color: #888; /* Lighter placeholder text */
+  opacity: 1; /* Ensure opacity is set for some browsers */
 }
 
 /* Styling for the date picker group */

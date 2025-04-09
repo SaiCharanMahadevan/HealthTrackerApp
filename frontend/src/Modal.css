@@ -1,0 +1,51 @@
+/* Modal.css */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* Ensure it's on top */
+}
+
+.modal-content {
+  background-color: #3a3a3a; /* Match card background */
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  position: relative;
+  max-width: 90%;
+  width: 600px; /* Default width */
+  max-height: 90vh; /* Limit height */
+  overflow-y: auto; /* Allow scrolling if content exceeds height */
+  box-sizing: border-box;
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 1.8rem; /* Larger close button */
+  color: #aaa;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.2rem;
+}
+
+.modal-close-button:hover {
+  color: #fff;
+}
+
+.modal-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #555;
+  color: #eee;
+  font-size: 1.3rem;
+} 
