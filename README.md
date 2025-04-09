@@ -8,28 +8,38 @@ This application allows users to log various health-related activities, meals, a
 
 ## Features
 
-*   **User Authentication:** Secure user registration (signup), login, and logout.
-*   **Natural Language Entry:** Log food, weight, and steps using plain text (e.g., "had 2 eggs and toast", "weight 80kg", "walked 5000 steps").
-*   **Image-Based Food Logging:** Upload an image of a meal for automatic food item identification and nutritional estimation.
-*   **AI-Powered Parsing:** Utilizes Google Gemini (1.5 Pro) for multimodal analysis of text and images to extract structured health data (type, value, unit, nutritional info).
-*   **Open Food Facts Integration:** Enhances nutritional data accuracy for recognized food items.
-*   **Diary View:**
-    *   Daily Summary: Displays total calories, total steps, and last recorded weight for a selected date.
-    *   Date Navigation: Easily navigate between daily summaries (previous/next day buttons, date picker).
-    *   Entry Form: Input text or upload images for logging.
-    *   Backdating: Log entries for past dates.
-    *   Entry List: View a chronological list of logged entries with edit and delete capabilities.
-*   **Reports View:**
-    *   Weekly Summary: Provides averages for calories, macronutrients, steps, and weight over a week.
-    *   Trend Charts: Visualizes weight and step trends over time.
-*   **Timezone Awareness:** Summaries and reports are calculated based on the user's local timezone.
-*   **Technology Stack:**
-    *   Backend: FastAPI (Python)
-    *   Frontend: React (JavaScript)
-    *   Database: SQLite
-    *   AI Model: Google Gemini
-    *   OR M: SQLAlchemy
+*   **Goal:** Log food, weight, steps (text/image). View summaries & trends.
+*   **Tech:** React Frontend, Python/FastAPI Backend, PostgreSQL DB, Google Gemini AI. Deployed on Render.
+*   **Key Features:**
+    *   User Signup/Login
+    *   Diary Page: Add/Edit/Delete entries via modal. View daily summary & entry list.
+    *   Reports Page: View weekly averages & trends charts.
+    *   AI Parsing: Extracts food, weight, steps. Estimates nutrition (with OFF fallback).
+    *   Image Handling: Upload & auto-delete after processing.
+*   **Status:** Deployed. Ongoing UI/AI refinements.
+
+## Technology Stack
+
+*   Backend: FastAPI (Python)
+*   Frontend: React (JavaScript) with Vite
+*   Database: PostgreSQL (Deployed on Render)
+*   AI Model: Google Gemini (1.5 Pro / 1.5 Flash)
+*   ORM: SQLAlchemy
+*   Deployment: Render.com
 
 ## Setup and Running
+
+This project is organized into two main directories:
+
+*   `frontend/`: Contains the React single-page application.
+*   `backend/`: Contains the FastAPI API server.
+
+Each directory (`frontend/` and `backend/`) has its own specific `README.md` file with detailed instructions for local setup, including:
+
+*   Installing dependencies
+*   Configuring environment variables (e.g., API keys, database connections for the backend)
+*   Running the development server
+
+**Please refer to the `README.md` file within each respective directory (`frontend/README.md` and `backend/README.md`) to run the application locally.**
 
 *(TODO: Add instructions for setting up the backend and frontend, including environment variables, dependencies, database creation, and run commands)* 
